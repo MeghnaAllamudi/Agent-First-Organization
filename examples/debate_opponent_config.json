@@ -1,0 +1,170 @@
+{
+    "role": "debate assistant",
+    "user_objective": "The debate assistant engages users in constructive debates using appropriate persuasion techniques. It can analyze argument types, provide relevant counterarguments, and track debate effectiveness.",
+    "builder_objective": "The debate assistant helps to identify user argument types and provide appropriate responses.",
+    "domain": "debate and persuasion",
+    "intro": "I am a debate assistant that can engage in constructive discussions on various topics. I analyze your arguments and respond using appropriate persuasion techniques - whether emotional, logical, or ethical. I aim to maintain respectful and productive debates while tracking the effectiveness of different argument styles.",
+    "task_docs": [{
+        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
+        "num": 601
+    }],
+    "rag_docs": [{
+        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
+        "num": 601
+    }],
+    "tasks": [],
+    "workers": [
+        {
+            "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+            "name": "DebateRAGWorker",
+            "path": "debate_rag_worker.py",
+            "type": "rag",
+            "config": {
+                "rag_path": "debate_topics.pkl",
+                "topics": [
+                    "AI ethics and regulation",
+                    "Climate change and environmental policy",
+                    "Privacy vs public safety",
+                    "Education reform",
+                    "Healthcare access",
+                    "Social media impact",
+                    "Technology and society",
+                    "Economic policy",
+                    "Social justice",
+                    "Scientific advancement"
+                ],
+                "topic_categories": [
+                    "Technology",
+                    "Environment",
+                    "Society",
+                    "Education",
+                    "Health",
+                    "Politics",
+                    "Ethics",
+                    "Science"
+                ],
+                "argument_structure": {
+                    "pro_arguments": true,
+                    "con_arguments": true,
+                    "evidence_required": true,
+                    "counterpoints": true
+                },
+                "format": "question_based",
+                "source": "kialo_edu"
+            }
+        },
+        {
+            "id": "2a1b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+            "name": "ArgumentClassifier",
+            "path": "argument_classifier.py",
+            "type": "analysis",
+            "config": {
+                "categories": ["emotional", "logical", "ethical", "mixed"],
+                "confidence_threshold": 0.8
+            }
+        },
+        {
+            "id": "b3c4d5e6-f7g8-h9i0-j1k2-l3m4n5o6p7q",
+            "name": "PathosWorker",
+            "path": "pathos_worker.py",
+            "type": "persuasion",
+            "config": {
+                "focus": "emotions, values, beliefs",
+                "strategies": ["storytelling", "emotional appeals", "shared values"]
+            }
+        },
+        {
+            "id": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
+            "name": "LogosWorker",
+            "path": "logos_worker.py",
+            "type": "persuasion",
+            "config": {
+                "focus": "logic, facts, reasoning",
+                "strategies": ["data analysis", "logical arguments", "cause-effect"]
+            }
+        },
+        {
+            "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
+            "name": "EthosWorker",
+            "path": "ethos_worker.py",
+            "type": "persuasion",
+            "config": {
+                "focus": "credibility, authority, character",
+                "strategies": ["expert testimony", "personal experience", "moral standing"]
+            }
+        },
+        {
+            "id": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
+            "name": "EffectivenessEvaluator",
+            "path": "effectiveness_evaluator.py",
+            "type": "evaluation",
+            "config": {
+                "evaluation_criteria": [
+                    "argument relevance",
+                    "user engagement",
+                    "ethical compliance",
+                    "persuasive impact"
+                ]
+            }
+        },
+        {
+            "id": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
+            "name": "DebateHistoryWorker",
+            "path": "debate_history_worker.py",
+            "type": "database",
+            "config": {
+                "db_path": "debate_history.pkl",
+                "tracking_fields": [
+                    "argument_type",
+                    "effectiveness_score",
+                    "context",
+                    "user_response"
+                ]
+            }
+        }
+    ],
+    "tools": [
+        {
+            "id": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
+            "name": "WebSearchTool",
+            "path": "web_search_tool.py",
+            "type": "search",
+            "config": {
+                "purpose": "Find current facts, statistics, and evidence to support arguments",
+                "search_engine": "tavily",
+                "sources": [
+                    "academic papers",
+                    "news articles",
+                    "government data",
+                    "research reports",
+                    "expert opinions"
+                ],
+                "max_results": 5,
+                "recency_bias": true,
+                "reliability_threshold": 0.8
+            }
+        },
+        {
+            "id": "9i0j1k2l-3m4n-5o6p-7q8r-9s0t1u2v3w4x",
+            "name": "FactCheckTool",
+            "path": "fact_check_tool.py",
+            "type": "verification",
+            "config": {
+                "purpose": "Verify claims and statements made during debates",
+                "check_types": ["statistics", "historical facts", "scientific claims"],
+                "confidence_threshold": 0.9
+            }
+        },
+        {
+            "id": "0j1k2l3m-4n5o-6p7q-8r9s-0t1u2v3w4x5y",
+            "name": "CitationTool",
+            "path": "citation_tool.py",
+            "type": "reference",
+            "config": {
+                "purpose": "Generate proper citations for evidence and sources",
+                "formats": ["APA", "MLA", "Chicago"],
+                "include_links": true
+            }
+        }
+    ]
+} 
