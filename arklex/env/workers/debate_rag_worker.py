@@ -1,24 +1,38 @@
 import logging
 from typing import Any, Dict, List
+import random
 
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
-from arklex.env.workers.faiss_rag_worker import FaissRAGWorker
+from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
+from arklex.utils.model_provider_config import PROVIDER_MAP
+from arklex.utils.debate_loader import DebateLoader
 
 
 logger = logging.getLogger(__name__)
 
 
-class DebateRAGWorker(FaissRAGWorker):
-    """A RAG worker specifically designed for debate topics and arguments."""
+@register_worker
+class DebateRAGWorker(BaseWorker):
+    """A worker specifically designed for debate topics and arguments."""
     
-    description = "Retrieves and generates debate topics and arguments from a curated database of debate topics and structured arguments."
+    description = "Retrieves and generates debate topics and arguments from Kialo."
 
-    def __init__(self, stream_response: bool = True):
-        super().__init__(stream_response=stream_response)
+    def __init__(self):
+        super().__init__()
+        self.stream_response = MODEL.get("stream_response", True)
+        self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
+            model=MODEL["model_type_or_path"], timeout=30000
+        )
+        
+        # Initialize debate loader
+        self.loader = DebateLoader()
+        
         self.debate_prompt = PromptTemplate.from_template(
             """Based on the following debate topic and context, generate a structured argument.
             Consider both sides of the debate and provide evidence-based reasoning.
@@ -36,33 +50,63 @@ class DebateRAGWorker(FaissRAGWorker):
         )
 
     def _create_action_graph(self):
-        """Creates a modified action graph for debate-specific retrieval and generation."""
-        workflow = super()._create_action_graph()
+        """Creates an action graph for debate-specific retrieval and generation."""
+        from langgraph.graph import StateGraph, START
         
-        # Add debate-specific nodes
+        workflow = StateGraph(MessageState)
+        
+        # Add nodes
         workflow.add_node("debate_formatter", self._format_debate_response)
         
-        # Modify edges to include debate formatting
-        workflow.add_conditional_edges(
-            "tool_generator", 
-            lambda x: "debate_formatter" if x.get("is_debate") else "end"
-        )
-        workflow.add_conditional_edges(
-            "stream_tool_generator", 
-            lambda x: "debate_formatter" if x.get("is_debate") else "end"
-        )
+        # Add edges
+        workflow.add_edge(START, "debate_formatter")
         
         return workflow
 
     def _format_debate_response(self, state: MessageState) -> MessageState:
         """Formats the retrieved content into a structured debate response."""
-        # Get the topic from the user's message
-        topic = state.get("user_message", {}).get("topic", "")
+        # Get URLs from the base topic page
+        base_url = "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics"
+        urls = self.loader.get_all_urls(base_url, max_num=10)
+        
+        if not urls:
+            raise Exception("No topics found")
+            
+        # Select one random topic
+        topic_url = random.choice(urls)
+        logger.info(f"Selected random topic URL: {topic_url}")
+        
+        # Create a CrawledURLObject for the topic
+        from arklex.utils.loader import CrawledURLObject
+        topic_obj = CrawledURLObject(
+            id="topic_1",
+            url=topic_url,
+            content=None,
+            metadata={"type": "topic"}
+        )
+        
+        # Crawl the topic page
+        topic_docs = self.loader.crawl_urls([topic_obj])
+        if not topic_docs or topic_docs[0].is_error:
+            raise Exception(f"Error crawling topic: {topic_docs[0].error_message if topic_docs else 'No documents'}")
+            
+        topic_doc = topic_docs[0]
+        topic_content = topic_doc.content.split('\n')
+        
+        # Get topic name and arguments
+        topic_name = topic_content[0].replace('Topic: ', '')
+        arguments = []
+        
+        for line in topic_content[1:]:
+            if line.startswith('PRO:') or line.startswith('CON:'):
+                arg_type = 'ethical' if 'ethical' in line.lower() else 'logical'
+                arg_content = line.split(':', 1)[1].strip()
+                arguments.append(arg_content)
         
         # Format the response using the debate prompt
         formatted_response = self.debate_prompt.format(
-            topic=topic,
-            context=state.get("message_flow", "")
+            topic=topic_name,
+            context="\n".join(arguments)
         )
         
         # Generate the final response
@@ -74,9 +118,11 @@ class DebateRAGWorker(FaissRAGWorker):
         return state
 
     def execute(self, msg_state: MessageState) -> MessageState:
-        """Executes the debate RAG workflow."""
+        """Executes the debate workflow."""
         # Add debate flag to state
         msg_state["is_debate"] = True
         
-        # Execute the parent workflow
-        return super().execute(msg_state) 
+        # Execute the workflow
+        workflow = self._create_action_graph()
+        graph = workflow.compile()
+        return graph.invoke(msg_state) 

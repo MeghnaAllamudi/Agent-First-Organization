@@ -17,6 +17,15 @@ from arklex.env.tools.RAG.build_rag import build_rag
 from arklex.env.tools.database.build_database import build_database
 from arklex.utils.model_config import MODEL
 from arklex.utils.rate_limiter import RateLimiter
+from arklex.utils.debate_loader import DebateLoader
+from arklex.env.workers.worker import BaseWorker, register_worker
+from arklex.env.workers.debate_rag_worker import DebateRAGWorker
+from arklex.env.workers.message_worker import MessageWorker
+from arklex.env.workers.persuasion_worker import PathosWorker, LogosWorker, EthosWorker
+from arklex.env.workers.argument_classifier import ArgumentClassifier
+from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
+from arklex.env.workers.debate_history_worker import DebateHistoryWorker
+from arklex.env.tools.citation_tool import CitationTool, register_tool
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
@@ -27,6 +36,11 @@ rate_limiter = RateLimiter()
 # API_PORT = "55135"
 # NLUAPI_ADDR = f"http://localhost:{API_PORT}/nlu"
 # SLOTFILLAPI_ADDR = f"http://localhost:{API_PORT}/slotfill"
+
+def create_output_dir(output_dir: str):
+    """Create output directory if it doesn't exist."""
+    os.makedirs(output_dir, exist_ok=True)
+
 
 def generate_taskgraph(args):
     model = ChatOpenAI(model=MODEL["model_type_or_path"], timeout=30000)
@@ -48,37 +62,64 @@ def generate_taskgraph(args):
 
 
 def init_worker(args):
-    ## TODO: Need to customized based on different use cases
+    """Initialize workers and tools."""
+    # Load config
     config = json.load(open(args.config))
-    workers = config["workers"]
-    worker_names = set([worker["name"] for worker in workers])
     
-    # Estimate tokens for the config and wait if needed
-    config_text = json.dumps(config)
-    estimated_tokens = rate_limiter.estimate_tokens(config_text)
-    rate_limiter.wait_if_needed(estimated_tokens)
+    # Create output directory
+    create_output_dir(args.output_dir)
     
-    if "FaissRAGWorker" in worker_names:
-        logger.info("Initializing FaissRAGWorker...")
-        # if url: uncomment the following line
-        build_rag(args.output_dir, config["rag_docs"])
-        # if shopify: uncomment the following lines
-        # import shopify
-        # from arklex.utils.loaders.shopify import ShopifyLoader
-        # session = shopify.Session(os.environ["SHOPIFY_SHOP_URL"], os.environ["SHOPIFY_API_VERSION"], os.environ["SHOPIFY_ACCESS_TOKEN"])
-        # shopify.ShopifyResource.activate_session(session)
-        # loader = ShopifyLoader()
-        # docs = loader.load()
-        # filepath = os.path.join(args.output_dir, "documents.pkl")
-        # ShopifyLoader.save(filepath, docs)
-        # chunked_docs = loader.chunk(docs)
-        # filepath_chunk = os.path.join(args.output_dir, "chunked_documents.pkl")
-        # ShopifyLoader.save(filepath_chunk, chunked_docs)
+    # Initialize workers
+    for worker_config in config["workers"]:
+        worker_type = worker_config["type"]
+        worker_id = worker_config["id"]
+        worker_name = worker_config["name"]
         
-
-    elif any(node in worker_names for node in ("DataBaseWorker", "search_show", "book_show", "check_booking", "cancel_booking")):
-        logger.info("Initializing DataBaseWorker...")
-        build_database(args.output_dir)
+        # Parse the config if it's a string
+        if isinstance(worker_config["config"], str):
+            worker_config["config"] = json.loads(worker_config["config"])
+        
+        if worker_type == "rag":
+            worker = DebateRAGWorker()
+        elif worker_type == "base":
+            worker = MessageWorker()  # No config needed
+        elif worker_type == "persuasion":
+            # Use worker name to determine type
+            if worker_name == "PathosWorker":
+                worker = PathosWorker(worker_config["config"])
+            elif worker_name == "LogosWorker":
+                worker = LogosWorker(worker_config["config"])
+            elif worker_name == "EthosWorker":
+                worker = EthosWorker(worker_config["config"])
+            else:
+                logger.warning(f"Unknown persuasion worker: {worker_name}")
+                continue
+        elif worker_type == "analysis":
+            worker = ArgumentClassifier(worker_config["config"])
+        elif worker_type == "evaluation":
+            worker = EffectivenessEvaluator(worker_config["config"])
+        elif worker_type == "history":
+            worker = DebateHistoryWorker()
+        else:
+            logger.warning(f"Unknown worker type: {worker_type}")
+            continue
+            
+        # Set worker name to match ID
+        worker.name = worker_id
+    
+    # Initialize tools
+    for tool_config in config["tools"]:
+        tool_type = tool_config["type"]
+        tool_id = tool_config["id"]
+        
+        if tool_type == "reference":  # Changed from "citation" to "reference"
+            tool = CitationTool()  # No config needed
+        else:
+            logger.warning(f"Unknown tool type: {tool_type}")
+            continue
+            
+        # Register tool
+        register_tool(tool_id, tool)
 
 
 if __name__ == "__main__":
@@ -96,9 +137,10 @@ if __name__ == "__main__":
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
     
+    
     if args.task == "all":
-        generate_taskgraph(args)
         init_worker(args)
+        generate_taskgraph(args)
     elif args.task == "gen_taskgraph":
         generate_taskgraph(args)
     elif args.task == "init":
