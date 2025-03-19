@@ -16,9 +16,13 @@ from arklex.orchestrator.generator.generator import Generator
 from arklex.env.tools.RAG.build_rag import build_rag
 from arklex.env.tools.database.build_database import build_database
 from arklex.utils.model_config import MODEL
+from arklex.utils.rate_limiter import RateLimiter
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
+
+# Initialize rate limiter
+rate_limiter = RateLimiter()
 
 # API_PORT = "55135"
 # NLUAPI_ADDR = f"http://localhost:{API_PORT}/nlu"
@@ -27,6 +31,13 @@ load_dotenv()
 def generate_taskgraph(args):
     model = ChatOpenAI(model=MODEL["model_type_or_path"], timeout=30000)
     generator = Generator(args, args.config, model, args.output_dir)
+    
+    # Estimate tokens and wait if needed
+    with open(args.config, 'r') as f:
+        config_text = f.read()
+    estimated_tokens = rate_limiter.estimate_tokens(config_text)
+    rate_limiter.wait_if_needed(estimated_tokens)
+    
     taskgraph_filepath = generator.generate()
     # Update the task graph with the API URLs
     task_graph = json.load(open(os.path.join(os.path.dirname(__file__), taskgraph_filepath)))
@@ -41,6 +52,12 @@ def init_worker(args):
     config = json.load(open(args.config))
     workers = config["workers"]
     worker_names = set([worker["name"] for worker in workers])
+    
+    # Estimate tokens for the config and wait if needed
+    config_text = json.dumps(config)
+    estimated_tokens = rate_limiter.estimate_tokens(config_text)
+    rate_limiter.wait_if_needed(estimated_tokens)
+    
     if "FaissRAGWorker" in worker_names:
         logger.info("Initializing FaissRAGWorker...")
         # if url: uncomment the following line
