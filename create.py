@@ -21,11 +21,16 @@ from arklex.utils.debate_loader import DebateLoader
 from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.env.workers.debate_rag_worker import DebateRAGWorker
 from arklex.env.workers.message_worker import MessageWorker
-from arklex.env.workers.persuasion_worker import PathosWorker, LogosWorker, EthosWorker
+from arklex.env.workers.default_worker import DefaultWorker
+from arklex.env.workers.persuasion_worker import PersuasionWorker
 from arklex.env.workers.argument_classifier import ArgumentClassifier
 from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
 from arklex.env.workers.debate_history_worker import DebateHistoryWorker
-from arklex.env.tools.citation_tool import CitationTool, register_tool
+from arklex.env.tools.json_parsing_tool import JSONParsingTool
+from arklex.env.tools.error_handling_tool import ErrorHandlingTool
+from arklex.env.tools.argument_validation_tool import ArgumentValidationTool
+from arklex.env.tools.technique_formatting_tool import TechniqueFormattingTool
+from arklex.env.workers.debate_history_analyzer import DebateHistoryAnalyzer
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
@@ -69,6 +74,9 @@ def init_worker(args):
     # Create output directory
     create_output_dir(args.output_dir)
     
+    # Create a dictionary of tools for easy access
+    tools_dict = {tool["name"]: tool for tool in config["tools"]}
+    
     # Initialize workers
     for worker_config in config["workers"]:
         worker_type = worker_config["type"]
@@ -79,23 +87,29 @@ def init_worker(args):
         if isinstance(worker_config["config"], str):
             worker_config["config"] = json.loads(worker_config["config"])
         
-        if worker_type == "rag":
+        if worker_name == "PersuasionWorker":
+            persuasion_tools = {
+                "validation_tool": tools_dict["argument_validation_tool"],
+                "json_tool": tools_dict["json_parsing_tool"],
+                "technique_tool": tools_dict["technique_formatting_tool"],
+                "error_tool": tools_dict["error_handling_tool"]
+            }
+            worker = PersuasionWorker(
+                techniques=worker_config["config"].get("techniques"),
+                tools=persuasion_tools,
+                config=worker_config["config"]
+            )
+        elif worker_type == "rag":
             worker = DebateRAGWorker()
         elif worker_type == "base":
             worker = MessageWorker()  # No config needed
-        elif worker_type == "persuasion":
-            # Use worker name to determine type
-            if worker_name == "PathosWorker":
-                worker = PathosWorker(worker_config["config"])
-            elif worker_name == "LogosWorker":
-                worker = LogosWorker(worker_config["config"])
-            elif worker_name == "EthosWorker":
-                worker = EthosWorker(worker_config["config"])
-            else:
-                logger.warning(f"Unknown persuasion worker: {worker_name}")
-                continue
+        elif worker_type == "base_def":
+            worker = DefaultWorker()
         elif worker_type == "analysis":
-            worker = ArgumentClassifier(worker_config["config"])
+            if worker_name == "DebateHistoryAnalyzer":
+                worker = DebateHistoryAnalyzer(worker_config["config"])
+            else:
+                worker = ArgumentClassifier(worker_config["config"])
         elif worker_type == "evaluation":
             worker = EffectivenessEvaluator(worker_config["config"])
         elif worker_type == "history":
@@ -106,20 +120,6 @@ def init_worker(args):
             
         # Set worker name to match ID
         worker.name = worker_id
-    
-    # Initialize tools
-    for tool_config in config["tools"]:
-        tool_type = tool_config["type"]
-        tool_id = tool_config["id"]
-        
-        if tool_type == "reference":  # Changed from "citation" to "reference"
-            tool = CitationTool()  # No config needed
-        else:
-            logger.warning(f"Unknown tool type: {tool_type}")
-            continue
-            
-        # Register tool
-        register_tool(tool_id, tool)
 
 
 if __name__ == "__main__":
@@ -137,10 +137,9 @@ if __name__ == "__main__":
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
     
-    
     if args.task == "all":
-        init_worker(args)
         generate_taskgraph(args)
+        init_worker(args)
     elif args.task == "gen_taskgraph":
         generate_taskgraph(args)
     elif args.task == "init":
