@@ -81,7 +81,7 @@ Resources: {resources}
 Reasoning:
 """
 
-debate_generate_best_practice_sys_prompt = """Given the background information about the debate opponent chatbot, the task it needs to handle, and the available resources, your task is to generate a step-by-step best practice for addressing this task. Each step should represent a distinct interaction in the debate flow. Remember that the debate opponent should ALWAYS adopt a position opposite to the user's stance and actively challenge their arguments. Return the answer in JSON format.
+debate_generate_best_practice_sys_prompt = """Given the background information about the debate opponent chatbot, the task it needs to handle, and the available resources, your task is to generate a step-by-step best practice for addressing this task. Each step should represent a distinct interaction in the debate flow. Remember that the debate opponent should ALWAYS adopt a position opposite to the user's stance and actively challenge their arguments. Each interaction with the user MUST include an effectiveness evaluation followed by database updates to track performance. Return the answer in JSON format.
 
 For example:
 Background: The builder wants to create a chatbot - Debate Opponent. The debate opponent actively takes opposing positions to the user's stance, vigorously challenging their viewpoints with strong counter-arguments.
@@ -92,9 +92,11 @@ Resources:
 ArgumentClassifier: Classifies arguments into emotional, logical, or ethical categories
 DebateHistoryAnalyzer: Analyzes past debate performance to recommend persuasion types
 PersuasionWorker: Generates counter-arguments using appropriate persuasion techniques
+EffectivenessEvaluator: Evaluates the effectiveness of counter-arguments based on multiple criteria
+DebateHistoryWorker: Tracks debate history and updates effectiveness scores in the database
 MessageWorker: The worker responsible for interacting with the user with predefined responses
 
-Thought: To effectively counter a user's argument, the bot should first analyze the argument type and identify the user's stance. Then, it should determine the opposite position and the most effective persuasion strategy. Next, it should generate strong counter-arguments that directly challenge the user's position. Finally, it should present these counter-arguments in a confrontational but engaging way that forces the user to defend their position.
+Thought: To effectively counter a user's argument, the bot should first analyze the argument type and identify the user's stance. Then, it should determine the opposite position and the most effective persuasion strategy using debate history. Next, it should generate strong counter-arguments that directly challenge the user's position, evaluate their effectiveness, update the history database, and present them to the user in a confrontational manner.
 
 Answer:
 ```json
@@ -113,6 +115,14 @@ Answer:
     }},
     {{
         "step": 4,
+        "task": "Evaluate the effectiveness of the counter-arguments"
+    }},
+    {{
+        "step": 5,
+        "task": "Update debate history with effectiveness scores to track performance"
+    }},
+    {{
+        "step": 6,
         "task": "Present the opposing arguments in a challenging way"
     }}
 ]
@@ -124,7 +134,7 @@ Resources: {resources}
 Thought:
 """
 
-debate_embed_resources_sys_prompt = """Given the best practice steps and available resources for the debate opponent, map each step to the appropriate resource and ensure the steps are properly connected. Each step MUST include an example_response field that shows what the resource would output. Remember that the debate opponent always takes a position contrary to the user's stance. Return the answer in JSON format.
+debate_embed_resources_sys_prompt = """Given the best practice steps and available resources for the debate opponent, map each step to the appropriate resource and ensure the steps are properly connected. Each step MUST include an example_response field that shows what the resource would output. Remember that the debate opponent always takes a position contrary to the user's stance. IMPORTANT: Make sure the EffectivenessEvaluator's outputs feed into the DebateHistoryWorker for database updates after each user interaction. Return the answer in JSON format.
 
 For example:
 Best Practice:
@@ -152,6 +162,20 @@ Best Practice:
     }},
     {{
         "step": 4,
+        "task": "Evaluate the effectiveness of the counter-arguments",
+        "resource": "EffectivenessEvaluator",
+        "example_response": "The counter-arguments score 0.85 on persuasiveness, with strong logical structure and evidence. The constitutional rights angle is particularly compelling, though emotional impact could be stronger.",
+        "resource_id": "effectiveness_evaluator_id"
+    }},
+    {{
+        "step": 5,
+        "task": "Update debate history with effectiveness scores to track performance",
+        "resource": "DebateHistoryWorker",
+        "example_response": "Debate history updated. Logical counter-arguments against emotional safety appeals have an average effectiveness score of 0.82 across past debates.",
+        "resource_id": "debate_history_worker_id"
+    }},
+    {{
+        "step": 6,
         "task": "Present the opposing arguments in a challenging way",
         "resource": "MessageWorker",
         "example_response": "Your emotional appeals about safety ignore constitutional rights and empirical evidence. How do you justify restricting freedoms when data shows gun control laws have failed to reduce violent crime in many locations? Shouldn't we focus on mental health and enforcement of existing laws instead?",
@@ -168,7 +192,8 @@ Thought: To properly map the steps to resources and ensure they are connected, w
 2. Ensure the steps flow logically from one to another to create an adversarial debate experience
 3. Make sure each step has a descriptive example_response that shows what the resource would output, always challenging the user's position
 4. Include resource_id for each step to properly identify the resource
-5. Validate that the final step completes the task of presenting strong opposition to the user's stance
+5. Ensure that the EffectivenessEvaluator's outputs are passed to the DebateHistoryWorker for database updates
+6. Validate that the final flow completes the task of presenting strong opposition to the user's stance
 
 Answer:
 """
