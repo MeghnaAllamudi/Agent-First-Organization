@@ -26,11 +26,11 @@ from arklex.env.workers.persuasion_worker import PersuasionWorker
 from arklex.env.workers.argument_classifier import ArgumentClassifier
 from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
 from arklex.env.workers.debate_history_worker import DebateHistoryWorker
+from arklex.env.workers.debate_database_worker import DebateDatabaseWorker
 from arklex.env.tools.json_parsing_tool import JSONParsingTool
 from arklex.env.tools.error_handling_tool import ErrorHandlingTool
 from arklex.env.tools.argument_validation_tool import ArgumentValidationTool
 from arklex.env.tools.technique_formatting_tool import TechniqueFormattingTool
-from arklex.env.workers.debate_history_analyzer import DebateHistoryAnalyzer
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
@@ -87,18 +87,16 @@ def init_worker(args):
         if isinstance(worker_config["config"], str):
             worker_config["config"] = json.loads(worker_config["config"])
         
-        if worker_name == "PersuasionWorker":
+        if worker_type == "database" or worker_name == "DebateDatabaseWorker":
+            worker = DebateDatabaseWorker(worker_config["config"])
+        elif worker_name == "PersuasionWorker":
             persuasion_tools = {
                 "validation_tool": tools_dict["argument_validation_tool"],
                 "json_tool": tools_dict["json_parsing_tool"],
                 "technique_tool": tools_dict["technique_formatting_tool"],
                 "error_tool": tools_dict["error_handling_tool"]
             }
-            worker = PersuasionWorker(
-                techniques=worker_config["config"].get("techniques"),
-                tools=persuasion_tools,
-                config=worker_config["config"]
-            )
+            worker = PersuasionWorker(config=worker_config["config"])
         elif worker_type == "rag":
             worker = DebateRAGWorker()
         elif worker_type == "base":
@@ -107,7 +105,8 @@ def init_worker(args):
             worker = DefaultWorker()
         elif worker_type == "analysis":
             if worker_name == "DebateHistoryAnalyzer":
-                worker = DebateHistoryAnalyzer(worker_config["config"])
+                logger.warning(f"DebateHistoryAnalyzer has been removed, skipping worker: {worker_name}")
+                continue
             else:
                 worker = ArgumentClassifier(worker_config["config"])
         elif worker_type == "evaluation":

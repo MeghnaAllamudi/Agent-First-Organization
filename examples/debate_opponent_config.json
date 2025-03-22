@@ -1,9 +1,9 @@
 {
-    "role": "debate assistant",
-    "user_objective": "The debate assistant engages users in constructive debates using appropriate persuasion techniques. It can analyze argument types, provide relevant counterarguments, and track debate effectiveness.",
-    "builder_objective": "The debate assistant helps to identify user argument types and provide appropriate responses.",
+    "role": "Debate Opponent",
+    "user_objective": "The debate opponent actively takes opposing positions to the user's stance, vigorously challenging their viewpoints with strong counter-arguments. It does NOT present balanced perspectives but instead adopts and defends the opposite position from whatever the user argues, using persuasive techniques to strengthen its contrarian stance.",
+    "builder_objective": "The debate opponent helps users sharpen their argumentative skills by providing strong opposition to their viewpoints, forcing them to defend their positions more thoroughly and consider counter-arguments they might not have anticipated.",
     "domain": "debate and persuasion",
-    "intro": "I am a debate assistant that can engage in constructive discussions on various topics. I analyze your arguments and respond using appropriate persuasion techniques - whether emotional, logical, or ethical. I aim to maintain respectful and productive debates while tracking the effectiveness of different argument styles.",
+    "intro": "I am a debate opponent that adopts opposing stances to your arguments. I will challenge your position directly with the strongest counterarguments I can generate, taking the contrary position on any topic you present. This confrontational approach is designed to strengthen your argumentative skills and help you prepare for real-world debates.",
     "task_docs": [{
         "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
         "num": 601
@@ -19,152 +19,77 @@
             "name": "DebateRAGWorker",
             "path": "debate_rag_worker.py",
             "type": "rag",
-            "config": {
-                "rag_path": "debate_topics.pkl",
-                "topics": [
-                    "AI ethics and regulation",
-                    "Climate change and environmental policy",
-                    "Privacy vs public safety",
-                    "Education reform",
-                    "Healthcare access",
-                    "Social media impact",
-                    "Technology and society",
-                    "Economic policy",
-                    "Social justice",
-                    "Scientific advancement"
-                ],
-                "topic_categories": [
-                    "Technology",
-                    "Environment",
-                    "Society",
-                    "Education",
-                    "Health",
-                    "Politics",
-                    "Ethics",
-                    "Science"
-                ],
-                "argument_structure": {
-                    "pro_arguments": true,
-                    "con_arguments": true,
-                    "evidence_required": true,
-                    "counterpoints": true
-                },
-                "format": "question_based",
-                "source": "kialo_edu"
-            }
+            "config": "{\"rag_path\": \"debate_topics\", \"topics\": [\"Artificial intelligence ethics\", \"Climate change policy\", \"Social media impact\", \"Technology and society\", \"Economic policy\", \"Social justice\", \"Scientific advancement\"], \"topic_categories\": [\"Technology\", \"Environment\", \"Society\", \"Education\", \"Health\", \"Politics\", \"Ethics\", \"Science\"], \"argument_structure\": {\"pro_arguments\": true, \"con_arguments\": true, \"evidence_required\": true, \"counterpoints\": true}, \"format\": \"question_based\", \"source\": \"kialo_edu\"}"
         },
         {
-            "id": "2a1b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+            "id": "1521f4a2-f699-4c41-a751-274d30f4c171",
             "name": "ArgumentClassifier",
-            "path": "argument_classifier.py",
             "type": "analysis",
-            "config": {
-                "categories": ["emotional", "logical", "ethical", "mixed"],
-                "confidence_threshold": 0.8
-            }
+            "path": "argument_classifier.py",
+            "config": "{\"classification_types\": [\"logical\", \"emotional\", \"ethical\"]}",
+            "description": "Classifies arguments into emotional, logical, or ethical categories"
         },
         {
-            "id": "b3c4d5e6-f7g8-h9i0-j1k2-l3m4n5o6p7q",
-            "name": "PathosWorker",
-            "path": "pathos_worker.py",
+            "id": "ffb5faac-60c3-46a9-b116-d833d5a7bfa1",
+            "name": "PersuasionWorker",
             "type": "persuasion",
-            "config": {
-                "focus": "emotions, values, beliefs",
-                "strategies": ["storytelling", "emotional appeals", "shared values"]
-            }
+            "path": "persuasion_worker.py",
+            "config": "{\"techniques\": [\"logos\", \"pathos\", \"ethos\"]}",
+            "description": "Generates counter-arguments using appropriate persuasion techniques"
         },
         {
-            "id": "4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
-            "name": "LogosWorker",
-            "path": "logos_worker.py",
-            "type": "persuasion",
-            "config": {
-                "focus": "logic, facts, reasoning",
-                "strategies": ["data analysis", "logical arguments", "cause-effect"]
-            }
+            "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+            "name": "DebateMessageWorker",
+            "type": "base",
+            "path": "debate_message_worker.py",
+            "config": "{}",
+            "description": "Specialized worker that delivers debate responses using the most effective persuasion strategy"
         },
         {
-            "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
-            "name": "EthosWorker",
-            "path": "ethos_worker.py",
-            "type": "persuasion",
-            "config": {
-                "focus": "credibility, authority, character",
-                "strategies": ["expert testimony", "personal experience", "moral standing"]
-            }
-        },
-        {
-            "id": "6f7g8h9i-0j1k-2l3m-4n5o-6p7q8r9s0t1u",
+            "id": "70ba6243-0a95-4c9f-8578-4c543ab7a429",
             "name": "EffectivenessEvaluator",
-            "path": "effectiveness_evaluator.py",
             "type": "evaluation",
-            "config": {
-                "evaluation_criteria": [
-                    "argument relevance",
-                    "user engagement",
-                    "ethical compliance",
-                    "persuasive impact"
-                ]
-            }
+            "path": "effectiveness_evaluator.py",
+            "config": "{\"evaluation_metrics\": [\"persuasiveness\", \"logical_coherence\", \"emotional_impact\"]}",
+            "description": "Evaluates the effectiveness of counter-arguments"
         },
         {
-            "id": "7g8h9i0j-1k2l-3m4n-5o6p-7q8r9s0t1u2v",
-            "name": "DebateHistoryWorker",
-            "path": "debate_history_worker.py",
+            "id": "38a3c397-e6d8-4543-aa75-357d7a5bef54",
+            "name": "DebateDatabaseWorker",
             "type": "database",
-            "config": {
-                "db_path": "debate_history.pkl",
-                "tracking_fields": [
-                    "argument_type",
-                    "effectiveness_score",
-                    "context",
-                    "user_response"
-                ]
-            }
+            "path": "debate_database_worker.py",
+            "config": "{}",
+            "description": "Manages database operations for tracking and recommending persuasion techniques"
         }
     ],
     "tools": [
         {
-            "id": "8h9i0j1k-2l3m-4n5o-6p7q-8r9s0t1u2v3w",
-            "name": "WebSearchTool",
-            "path": "web_search_tool.py",
-            "type": "search",
-            "config": {
-                "purpose": "Find current facts, statistics, and evidence to support arguments",
-                "search_engine": "tavily",
-                "sources": [
-                    "academic papers",
-                    "news articles",
-                    "government data",
-                    "research reports",
-                    "expert opinions"
-                ],
-                "max_results": 5,
-                "recency_bias": true,
-                "reliability_threshold": 0.8
-            }
+            "id": "4df23da4-fae3-4e06-8efc-9296f17e8ece",
+            "name": "argument_validation_tool",
+            "path": "argument_validation_tool.py",
+            "description": "Validates argument structure and identifies logical fallacies",
+            "config": "{}"
         },
         {
-            "id": "9i0j1k2l-3m4n-5o6p-7q8r-9s0t1u2v3w4x",
-            "name": "FactCheckTool",
-            "path": "fact_check_tool.py",
-            "type": "verification",
-            "config": {
-                "purpose": "Verify claims and statements made during debates",
-                "check_types": ["statistics", "historical facts", "scientific claims"],
-                "confidence_threshold": 0.9
-            }
+            "id": "7519c074-4cb2-4102-ba58-b2213159863f",
+            "name": "json_parsing_tool",
+            "path": "json_parsing_tool.py",
+            "description": "Parses JSON responses for structured data handling",
+            "config": "{}"
         },
         {
-            "id": "0j1k2l3m-4n5o-6p7q-8r9s-0t1u2v3w4x5y",
-            "name": "CitationTool",
-            "path": "citation_tool.py",
-            "type": "reference",
-            "config": {
-                "purpose": "Generate proper citations for evidence and sources",
-                "formats": ["APA", "MLA", "Chicago"],
-                "include_links": true
-            }
+            "id": "7c163c3c-3a25-4252-91d5-aade341668f9",
+            "name": "technique_formatting_tool",
+            "path": "technique_formatting_tool.py",
+            "description": "Formats persuasion techniques for effective delivery",
+            "config": "{}"
+        },
+        {
+            "id": "451d1f0d-eb4f-4cd0-aa71-2416049e8992",
+            "name": "error_handling_tool",
+            "path": "error_handling_tool.py",
+            "description": "Handles errors and exceptions during debate flow",
+            "config": "{}"
         }
     ]
 } 

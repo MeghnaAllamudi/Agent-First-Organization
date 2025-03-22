@@ -96,7 +96,27 @@ class AgentOrg:
         chat_history_str = format_chat_history(chat_history_copy)
         dialog_states = params.get("dialog_states", {})
         if dialog_states:
-            params["dialog_states"] = {tool: [Slot(**slot_data) for slot_data in slots] for tool, slots in dialog_states.items()}
+            # Handle the case where slots might contain string values or objects without model_dump
+            processed_dialog_states = {}
+            for tool, slots in dialog_states.items():
+                processed_slots = []
+                for s in slots:
+                    if isinstance(s, str):
+                        # If it's a string, keep it as is
+                        processed_slots.append(s)
+                    else:
+                        # Otherwise, try to call model_dump() or fall back
+                        try:
+                            processed_slots.append(s.model_dump())
+                        except (AttributeError, TypeError):
+                            # If model_dump isn't available, try to convert to dict or use as is
+                            try:
+                                processed_slots.append(dict(s))
+                            except (TypeError, ValueError):
+                                # As a last resort, convert to string
+                                processed_slots.append(str(s))
+                processed_dialog_states[tool] = processed_slots
+            params["dialog_states"] = processed_dialog_states
         else:
             params["dialog_states"] = {}
         metadata = params.get("metadata", {})
@@ -253,16 +273,20 @@ class AgentOrg:
                     node_actions = [{"name": self.env.id2name[node_info["id"]], "description": self.env.workers[node_info["id"]]["execute"]().description}]
                 
                 # If the Default Worker enters the loop, it is the default node. It may call the RAG worker and no information in the context (tool response) can be used.
-                if node_info["id"] == self.env.name2id["DefaultWorker"]:
+                if node_info["id"] == self.env.name2id.get("DefaultWorker", ""):
                     logger.info("Skip the DefaultWorker in ReAct framework because it is the default node and may call the RAG worker (context cannot be used)")
                     action = RESPOND_ACTION_NAME
                     FINISH = True
                     break
-                # If the Message Worker enters the loop, ReAct framework cannot make a good decision between the MessageWorker and the RESPOND action.
-                elif node_info["id"] == self.env.name2id["MessageWorker"]:
+                # If any Message Worker enters the loop, ReAct framework cannot make a good decision between the MessageWorker and the RESPOND action.
+                elif (
+                    "MessageWorker" in self.env.name2id and node_info["id"] == self.env.name2id["MessageWorker"] or
+                    "DebateMessageWorker" in self.env.name2id and node_info["id"] == self.env.name2id["DebateMessageWorker"]
+                ):
                     logger.info("Skip ReAct framework because it is hard to distinguish between the MessageWorker and the RESPOND action")
                     message_state["response"] = "" # clear the response cache generated from the previous steps in the same turn
-                    response_state, params = self.env.step(self.env.name2id["MessageWorker"], message_state, params)
+                    # Use the current node_info["id"] instead of hardcoding MessageWorker
+                    response_state, params = self.env.step(node_info["id"], message_state, params)
                     FINISH = True
                     break
                 action_spaces = node_actions
@@ -301,7 +325,27 @@ class AgentOrg:
         params["metadata"]["tool_response"] = {}
         # TODO: params["metadata"]["worker"] is not serialization, make it empty for now
         if params.get("dialog_states"):
-            params["dialog_states"] = {tool: [s.model_dump() for s in slots] for tool, slots in params["dialog_states"].items()}
+            # Handle the case where slots might contain string values or objects without model_dump
+            processed_dialog_states = {}
+            for tool, slots in params["dialog_states"].items():
+                processed_slots = []
+                for s in slots:
+                    if isinstance(s, str):
+                        # If it's a string, keep it as is
+                        processed_slots.append(s)
+                    else:
+                        # Otherwise, try to call model_dump() or fall back
+                        try:
+                            processed_slots.append(s.model_dump())
+                        except (AttributeError, TypeError):
+                            # If model_dump isn't available, try to convert to dict or use as is
+                            try:
+                                processed_slots.append(dict(s))
+                            except (TypeError, ValueError):
+                                # As a last resort, convert to string
+                                processed_slots.append(str(s))
+                processed_dialog_states[tool] = processed_slots
+            params["dialog_states"] = processed_dialog_states
         params["metadata"]["worker"] = {}
         params["tool_response"] = tool_response
         output = {

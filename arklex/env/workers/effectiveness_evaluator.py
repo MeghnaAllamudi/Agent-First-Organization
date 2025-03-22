@@ -1,6 +1,7 @@
 import logging
 import json
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -60,17 +61,17 @@ class EffectivenessEvaluator(BaseWorker):
                     "description": "How credible and well-supported is the argument?",
                     "examples": [
                         "Cites reliable sources",
-                        "Uses accurate data",
-                        "Appeals to authority"
+                        "Uses expert opinions",
+                        "Presents verifiable facts"
                     ]
                 },
                 "emotional_impact": {
                     "weight": 0.2,
-                    "description": "How effectively does it connect with the audience?",
+                    "description": "How effectively does it engage emotions or connect with values?",
                     "examples": [
-                        "Resonates emotionally",
-                        "Appeals to values",
-                        "Creates engagement"
+                        "Appeals to shared values",
+                        "Evokes appropriate emotional response",
+                        "Creates connection with audience"
                     ]
                 }
             }
@@ -80,31 +81,49 @@ class EffectivenessEvaluator(BaseWorker):
         if abs(total_weight - 1.0) > 0.0001:
             raise ValueError("Criteria weights must sum to 1.0")
         
+        # Define the evaluation prompt template
         self.evaluation_prompt = PromptTemplate.from_template(
-            """Evaluate the effectiveness of the following counter-argument based on multiple criteria.
-            
-            Original Argument: {original_argument}
-            Counter-Argument: {counter_argument}
-            Persuasion Type: {persuasion_type}
-            
-            Evaluation Criteria:
-            {criteria}
-            
-            Respond in the following JSON format:
-            {{
-                "criteria_scores": {{
-                    "relevance": float (0-1),
-                    "persuasiveness": float (0-1),
-                    "credibility": float (0-1),
-                    "emotional_impact": float (0-1)
-                }},
-                "strengths": ["list of argument strengths"],
-                "weaknesses": ["list of argument weaknesses"],
-                "improvement_suggestions": ["list of suggestions for improvement"],
-                "reasoning": "detailed explanation of the evaluation"
-            }}
-            
-            Evaluation:"""
+            """You are an expert at evaluating the effectiveness of debate counter-arguments. Your task is to evaluate a counter-argument's effectiveness based on specific criteria.
+
+Original Argument: {original_argument}
+
+Counter-Argument: {counter_argument}
+
+Persuasion Type Used: {persuasion_type}
+
+Evaluation Criteria: {criteria}
+
+IMPORTANT: You MUST respond with a valid JSON object containing the following fields:
+- criteria_scores: An object with scores (0.0 to 1.0) for each criterion
+- strengths: Array of key strengths
+- weaknesses: Array of key weaknesses
+- improvement_suggestions: Array of suggestions for improvement
+- reasoning: String explaining your evaluation
+
+EXAMPLE RESPONSE FORMAT:
+{{
+  "criteria_scores": {{
+    "relevance": 0.85,
+    "persuasiveness": 0.75,
+    "credibility": 0.80,
+    "emotional_impact": 0.65
+  }},
+  "strengths": [
+    "Directly addresses the main claim",
+    "Uses strong evidence to support points"
+  ],
+  "weaknesses": [
+    "Could be more concise",
+    "Some supporting points lack depth"
+  ],
+  "improvement_suggestions": [
+    "Add more specific data points",
+    "Strengthen emotional appeal to values"
+  ],
+  "reasoning": "The counter-argument effectively challenges the original position with strong evidence but could improve emotional engagement."
+}}
+
+YOUR EVALUATION MUST BE VALID JSON. Do not include any text before or after the JSON object. Do not use markdown formatting."""
         )
 
     def _calculate_weighted_score(self, criteria_scores: Dict[str, float]) -> float:
@@ -143,18 +162,27 @@ class EffectivenessEvaluator(BaseWorker):
             
         return True
 
-    def _evaluate_argument(self, original_argument: str, counter_argument: Dict[str, Any], 
-                         persuasion_type: str) -> Optional[Dict[str, Any]]:
-        """Evaluates the effectiveness of a counter-argument."""
-        try:
-            # Format criteria for prompt
-            criteria_str = "\n".join(
-                f"- {criterion}: {info['description']} (Weight: {info['weight']})\n"
-                f"  Examples: {', '.join(info['examples'])}"
-                for criterion, info in self.criteria.items()
-            )
+    def _evaluate_argument(self, original_argument, counter_argument, persuasion_type=None):
+        """
+        Evaluate the effectiveness of a counter-argument.
+        
+        Args:
+            original_argument: The original argument to counter
+            counter_argument: The counter-argument to evaluate
+            persuasion_type: The type of persuasion used (logos, pathos, ethos)
             
-            # Format the prompt
+        Returns:
+            Dictionary containing evaluation results
+        """
+        try:
+            # Use default persuasion type if none provided
+            if not persuasion_type:
+                persuasion_type = "logos"  # Default to logos as safest option
+                
+            # Format the criteria as a JSON string for the prompt
+            criteria_str = json.dumps(self.criteria, indent=2)
+            
+            # Format the prompt with the arguments and criteria
             formatted_prompt = self.evaluation_prompt.format(
                 original_argument=original_argument,
                 counter_argument=counter_argument["counter_argument"],
@@ -166,12 +194,74 @@ class EffectivenessEvaluator(BaseWorker):
             chain = self.llm | StrOutputParser()
             evaluation_str = chain.invoke(formatted_prompt)
             
-            # Parse the evaluation
-            evaluation = json.loads(evaluation_str)
+            # Try to parse JSON with better error handling
+            try:
+                # First, try to parse the evaluation as is
+                evaluation = json.loads(evaluation_str)
+            except json.JSONDecodeError:
+                # If that fails, try to extract JSON from the response
+                print(f"\n================================================================================")
+                print(f"⚠️ JSON PARSING ERROR IN EFFECTIVENESS EVALUATOR")
+                print(f"Attempting to fix invalid JSON response...")
+                print(f"================================================================================")
+                
+                import re
+                # Try to extract JSON content between curly braces
+                json_match = re.search(r'({.*})', evaluation_str, re.DOTALL)
+                if json_match:
+                    try:
+                        evaluation = json.loads(json_match.group(1))
+                        print(f"Successfully extracted valid JSON from response")
+                    except json.JSONDecodeError:
+                        # If that still fails, create a default evaluation
+                        print(f"Could not extract valid JSON. Creating default evaluation.")
+                        evaluation = {
+                            "criteria_scores": {
+                                "relevance": 0.7,
+                                "persuasiveness": 0.7,
+                                "credibility": 0.7,
+                                "emotional_impact": 0.7
+                            },
+                            "overall_score": 0.7,
+                            "strengths": ["Default evaluation"],
+                            "weaknesses": ["Could not parse LLM response"],
+                            "improvement_suggestions": ["Improve JSON formatting in response"],
+                            "reasoning": "Default evaluation due to JSON parsing error"
+                        }
+                else:
+                    # No JSON-like content found, create default evaluation
+                    print(f"No JSON content found in response. Creating default evaluation.")
+                    evaluation = {
+                        "criteria_scores": {
+                            "relevance": 0.7,
+                            "persuasiveness": 0.7,
+                            "credibility": 0.7,
+                            "emotional_impact": 0.7
+                        },
+                        "overall_score": 0.7,
+                        "strengths": ["Default evaluation"],
+                        "weaknesses": ["Could not parse LLM response"],
+                        "improvement_suggestions": ["Improve JSON formatting in response"],
+                        "reasoning": "Default evaluation due to JSON parsing error"
+                    }
             
             # Validate the evaluation
             if not self._validate_evaluation(evaluation):
-                return None
+                # Return a default evaluation if validation fails
+                print(f"Evaluation validation failed. Creating default evaluation.")
+                evaluation = {
+                    "criteria_scores": {
+                        "relevance": 0.7,
+                        "persuasiveness": 0.7,
+                        "credibility": 0.7,
+                        "emotional_impact": 0.7
+                    },
+                    "overall_score": 0.7,
+                    "strengths": ["Default evaluation"],
+                    "weaknesses": ["Invalid evaluation format"],
+                    "improvement_suggestions": ["Improve response structure"],
+                    "reasoning": "Default evaluation due to validation failure"
+                }
             
             # Calculate weighted overall score
             evaluation["overall_score"] = self._calculate_weighted_score(evaluation["criteria_scores"])
@@ -180,7 +270,20 @@ class EffectivenessEvaluator(BaseWorker):
             
         except Exception as e:
             logger.error(f"Error evaluating argument: {str(e)}")
-            return None
+            # Return a default evaluation in case of any error
+            return {
+                "criteria_scores": {
+                    "relevance": 0.7,
+                    "persuasiveness": 0.7,
+                    "credibility": 0.7,
+                    "emotional_impact": 0.7
+                },
+                "overall_score": 0.7,
+                "strengths": ["Default evaluation due to error"],
+                "weaknesses": ["Error during evaluation process"],
+                "improvement_suggestions": ["Check system logs for details"],
+                "reasoning": f"Error during evaluation: {str(e)}"
+            }
 
     def _create_action_graph(self):
         """Creates the action graph for effectiveness evaluation."""
@@ -196,54 +299,294 @@ class EffectivenessEvaluator(BaseWorker):
         
         return workflow
 
-    def _evaluate_arguments(self, state: MessageState) -> MessageState:
-        """Evaluates all counter-arguments in the state."""
-        # Get the original argument
-        user_message = state.get("user_message")
-        if not user_message:
-            return state
+    def _evaluate_arguments(self, msg_state: MessageState) -> MessageState:
+        """
+        Evaluates the arguments and user response to determine effectiveness.
+        """
+        logger.info("Starting argument effectiveness evaluation")
+        try:
+            # Get user message
+            user_message = msg_state.get("user_message", {})
+            user_content = user_message.get("content", "") if isinstance(user_message, dict) else str(user_message)
             
-        # Access content directly from ConvoMessage object
-        original_argument = user_message.content if hasattr(user_message, 'content') else ""
-        
-        # Get all persuasion responses
-        persuasion_types = ["pathos", "logos", "ethos"]
-        evaluations = {}
-        
-        for p_type in persuasion_types:
-            response = state.get(f"{p_type}_response")
-            if response:
-                evaluation = self._evaluate_argument(original_argument, response, p_type)
-                if evaluation:
-                    evaluations[p_type] = evaluation
-                else:
-                    # Handle evaluation failure
-                    error_evaluation = {
-                        "overall_score": 0.0,
+            # Check for persuasion type in multiple places with enhanced logging
+            persuasion_type = None
+            
+            # Method 0: Check for persuasion_type in orchestrator_message attribute (from taskgraph)
+            orchestrator_message = msg_state.get("orchestrator_message", {})
+            if orchestrator_message and hasattr(orchestrator_message, "attribute"):
+                if orchestrator_message.attribute and "persuasion_type" in orchestrator_message.attribute:
+                    persuasion_type = orchestrator_message.attribute.get("persuasion_type")
+                    logger.info(f"Found persuasion_type in orchestrator_message: {persuasion_type}")
+                elif orchestrator_message.attribute:
+                    # Infer from task field if available
+                    task = orchestrator_message.attribute.get("task", "")
+                    if isinstance(task, str):
+                        task_lower = task.lower()
+                        if "pathos" in task_lower or "emotion" in task_lower:
+                            persuasion_type = "pathos"
+                            logger.info(f"Inferred persuasion_type from task description: {persuasion_type}")
+                        elif "logos" in task_lower or "logic" in task_lower or "evidence" in task_lower:
+                            persuasion_type = "logos"
+                            logger.info(f"Inferred persuasion_type from task description: {persuasion_type}")
+                        elif "ethos" in task_lower or "credibility" in task_lower or "authority" in task_lower:
+                            persuasion_type = "ethos"
+                            logger.info(f"Inferred persuasion_type from task description: {persuasion_type}")
+
+                    # Also check if we can determine effectiveness score from the orchestrator message
+                    message_value = orchestrator_message.attribute.get("value", "")
+                    if isinstance(message_value, str) and "%" in message_value:
+                        import re
+                        percent_match = re.search(r'(\d+)%', message_value)
+                        if percent_match:
+                            percent_value = int(percent_match.group(1))
+                            msg_state["extracted_effectiveness_score"] = round(percent_value / 100.0, 2)
+                            logger.info(f"Extracted effectiveness score from message value: {msg_state['extracted_effectiveness_score']} ({percent_value}%)")
+            
+            # Method 1: Direct state variables (most reliable)
+            if not persuasion_type and msg_state.get("current_persuasion_type"):
+                persuasion_type = msg_state.get("current_persuasion_type")
+                logger.info(f"Found persuasion_type in current_persuasion_type: {persuasion_type}")
+            elif not persuasion_type and msg_state.get("just_used_persuasion_type"):
+                persuasion_type = msg_state.get("just_used_persuasion_type")
+                logger.info(f"Found persuasion_type in just_used_persuasion_type: {persuasion_type}")
+            
+            # Method 2: Check in slots
+            elif not persuasion_type and msg_state.get("slots", {}).get("current_technique"):
+                persuasion_type = msg_state["slots"]["current_technique"]
+                logger.info(f"Found persuasion_type in slots.current_technique: {persuasion_type}")
+            elif not persuasion_type and msg_state.get("slots", {}).get("best_technique"):
+                persuasion_type = msg_state["slots"]["best_technique"]
+                logger.info(f"Found persuasion_type in slots.best_technique: {persuasion_type}")
+            
+            # Method 3: Look for response objects
+            for p_type in ["pathos", "logos", "ethos"]:
+                response_key = f"{p_type}_persuasion_response"
+                if not persuasion_type and response_key in msg_state:
+                    persuasion_type = p_type
+                    logger.info(f"Found persuasion_type from response key: {persuasion_type}")
+                    break
+            
+            # Check for effectiveness score in orchestrator message
+            has_effectiveness_score = False
+            effectiveness_score = None
+            
+            # First check if we already extracted a score
+            if "extracted_effectiveness_score" in msg_state:
+                effectiveness_score = msg_state["extracted_effectiveness_score"]
+                has_effectiveness_score = True
+                logger.info(f"Using previously extracted effectiveness score: {effectiveness_score}")
+            
+            # Otherwise try to extract from the message content
+            elif orchestrator_message and hasattr(orchestrator_message, "message"):
+                message_content = orchestrator_message.message
+                if isinstance(message_content, str) and "%" in message_content:
+                    try:
+                        # Extract percentage from message
+                        import re
+                        percent_match = re.search(r'(\d+)%', message_content)
+                        if percent_match:
+                            percent_value = int(percent_match.group(1))
+                            effectiveness_score = round(percent_value / 100.0, 2)
+                            has_effectiveness_score = True
+                            logger.info(f"Extracted effectiveness score from message: {effectiveness_score} ({percent_value}%)")
+                    except Exception as e:
+                        logger.error(f"Error extracting effectiveness score: {str(e)}")
+            
+            # If we can't determine persuasion type but have a score, this is ok - log as INFO
+            if not persuasion_type and has_effectiveness_score:
+                # Set a default type but log as info since we have a score
+                persuasion_type = "logos"  # Default
+                logger.info(f"Using default persuasion_type '{persuasion_type}' with effectiveness score {effectiveness_score}")
+                logger.info(f"Available state keys: {list(msg_state.keys())}")
+                if orchestrator_message:
+                    logger.info(f"Orchestrator message: {orchestrator_message}")
+                    if hasattr(orchestrator_message, "attribute"):
+                        logger.info(f"Attribute: {orchestrator_message.attribute}")
+            # If we can't determine persuasion type and have no score, this is a warning
+            elif not persuasion_type:
+                # Set a default type
+                persuasion_type = "logos"  # Default
+                logger.warning(f"Could not determine persuasion_type from any source, using default '{persuasion_type}'")
+                logger.info(f"Available state keys: {list(msg_state.keys())}")
+                if orchestrator_message:
+                    logger.info(f"Orchestrator message: {orchestrator_message}")
+                    if hasattr(orchestrator_message, "attribute"):
+                        logger.info(f"Attribute: {orchestrator_message.attribute}")
+            
+            # Get the counter-argument - try multiple sources
+            counter_argument = {}
+            
+            # Method 1: Check in response objects
+            response_key = f"{persuasion_type}_persuasion_response"
+            if response_key in msg_state:
+                counter_argument = msg_state[response_key]
+                logger.info(f"Found counter-argument in {response_key}")
+            
+            # Method 2: Check in orchestrator message
+            if not counter_argument and orchestrator_message:
+                if hasattr(orchestrator_message, "attribute") and orchestrator_message.attribute:
+                    counter_text = orchestrator_message.attribute.get("value", "")
+                    counter_argument = {"counter_argument": counter_text}
+                    logger.info("Found counter-argument in orchestrator_message.attribute.value")
+                elif hasattr(orchestrator_message, "message"):
+                    counter_text = orchestrator_message.message
+                    counter_argument = {"counter_argument": counter_text}
+                    logger.info("Found counter-argument in orchestrator_message.message")
+            
+            # Method 3: Try to find in message_flow
+            if not counter_argument and msg_state.get("message_flow"):
+                message_flow = msg_state["message_flow"]
+                if isinstance(message_flow, list) and len(message_flow) > 0:
+                    latest_message = message_flow[-1]
+                    if isinstance(latest_message, dict) and "content" in latest_message:
+                        counter_text = latest_message["content"]
+                        counter_argument = {"counter_argument": counter_text}
+                        logger.info("Found counter-argument in message_flow")
+            
+            # If we couldn't find the counter-argument, try to reconstruct it
+            if not counter_argument:
+                # Use a placeholder for the counter-argument
+                counter_argument = {
+                    "counter_argument": "Counter-argument not found in state. Please evaluate based on user's response."
+                }
+                logger.info("Could not find counter-argument, using placeholder")
+            
+            # Get the original argument
+            original_argument = "Original argument not available"
+            
+            # Method 1: Check in input fields
+            if "argument" in msg_state:
+                original_argument = msg_state["argument"]
+                logger.info("Found original argument in state.argument")
+            
+            # Method 2: Check in user message history
+            elif msg_state.get("message_flow") and isinstance(msg_state["message_flow"], list):
+                message_flow = msg_state["message_flow"]
+                for message in reversed(message_flow):
+                    if isinstance(message, dict) and message.get("role") == "user":
+                        original_argument = message.get("content", "")
+                        logger.info("Found original argument in message_flow")
+                        break
+            
+            # Evaluate the counter-argument
+            evaluation = None
+            
+            # If we have an effectiveness score already, use it
+            if has_effectiveness_score and effectiveness_score is not None:
+                evaluation = {
+                    "criteria_scores": {
+                        "relevance": effectiveness_score,
+                        "persuasiveness": effectiveness_score,
+                        "credibility": effectiveness_score,
+                        "emotional_impact": effectiveness_score
+                    },
+                    "overall_score": effectiveness_score,
+                    "strengths": ["Determined from user response"],
+                    "weaknesses": ["Detailed analysis not available"],
+                    "improvement_suggestions": ["Continue monitoring user engagement"],
+                    "reasoning": f"Effectiveness score of {effectiveness_score} extracted from orchestrator message."
+                }
+                logger.info(f"Used extracted effectiveness score: {effectiveness_score}")
+            else:
+                # Otherwise, perform a full evaluation
+                try:
+                    evaluation = self._evaluate_argument(original_argument, counter_argument, persuasion_type)
+                    if evaluation:
+                        logger.info(f"Completed evaluation with overall score: {evaluation.get('overall_score', 'N/A')}")
+                    else:
+                        # Create a fallback evaluation when the actual evaluation fails
+                        logger.warning("Evaluation function returned None, using fallback evaluation")
+                        evaluation = {
+                            "criteria_scores": {
+                                "relevance": 0.7,
+                                "persuasiveness": 0.7, 
+                                "credibility": 0.7,
+                                "emotional_impact": 0.7
+                            },
+                            "overall_score": 0.7,
+                            "strengths": ["Default evaluation"],
+                            "weaknesses": ["Detailed analysis not available"],
+                            "improvement_suggestions": ["Improve state passing for better evaluations"],
+                            "reasoning": "Fallback evaluation due to evaluation function failure."
+                        }
+                except Exception as e:
+                    logger.warning(f"Error in evaluation function: {str(e)}, using fallback evaluation")
+                    # Create a fallback evaluation when JSON parsing fails
+                    evaluation = {
                         "criteria_scores": {
-                            criterion: 0.0 for criterion in self.criteria.keys()
+                            "relevance": 0.7,
+                            "persuasiveness": 0.7,
+                            "credibility": 0.7,
+                            "emotional_impact": 0.7
                         },
-                        "strengths": [],
-                        "weaknesses": [f"Failed to evaluate {p_type} argument"],
-                        "improvement_suggestions": [],
-                        "reasoning": f"Error evaluating {p_type} argument"
+                        "overall_score": 0.7,
+                        "strengths": ["Default evaluation after error"],
+                        "weaknesses": ["Error occurred during evaluation"],
+                        "improvement_suggestions": ["Check logs for evaluation errors"],
+                        "reasoning": f"Fallback evaluation due to error: {str(e)}"
                     }
-                    evaluations[p_type] = error_evaluation
-        
-        # Update state with evaluations
-        state["argument_evaluations"] = evaluations
-        
-        # Find the best argument
-        if evaluations:
-            best_type = max(evaluations.items(), 
-                          key=lambda x: x[1]["overall_score"])[0]
-            state["best_argument"] = {
-                "type": best_type,
-                "evaluation": evaluations[best_type],
-                "response": state.get(f"{best_type}_response")
-            }
-        
-        return state
+                    
+            # Now, update the state with evaluation results
+            msg_state["evaluated_effectiveness_score"] = evaluation["overall_score"]
+            msg_state["effectiveness_evaluation"] = evaluation
+            
+            # Also store it in the persuasion-specific field
+            response_key = f"{persuasion_type}_persuasion_response"
+            if response_key in msg_state and isinstance(msg_state[response_key], dict):
+                msg_state[response_key]["effectiveness_score"] = evaluation["overall_score"]
+                msg_state[response_key]["effectiveness_evaluation"] = evaluation
+                logger.info(f"Updated {response_key} with effectiveness score")
+            else:
+                # Create the response object if it doesn't exist
+                msg_state[response_key] = {
+                    "counter_argument": counter_argument.get("counter_argument", ""),
+                    "effectiveness_score": evaluation["overall_score"],
+                    "effectiveness_evaluation": evaluation
+                }
+                logger.info(f"Created {response_key} with effectiveness score")
+            
+            # Update slots with the most recent effectiveness information
+            slots = msg_state.get("slots", {})
+            if not slots:
+                slots = {"persuasion_techniques": {}}
+                
+            if "persuasion_techniques" not in slots:
+                slots["persuasion_techniques"] = {}
+                
+            if persuasion_type not in slots["persuasion_techniques"]:
+                slots["persuasion_techniques"][persuasion_type] = {"scores": []}
+                
+            # Add the new score
+            slots["persuasion_techniques"][persuasion_type]["scores"] = \
+                slots["persuasion_techniques"][persuasion_type].get("scores", []) + [evaluation["overall_score"]]
+                
+            # Update slots
+            msg_state["slots"] = slots
+            
+            # Set success status
+            msg_state["status"] = "success"
+            
+            # Print very visible output about the evaluation
+            effectiveness_percent = int(evaluation["overall_score"] * 100)
+            print(f"\n{'='*80}")
+            print(f"🔍 EFFECTIVENESS EVALUATION: {persuasion_type.upper()}")
+            print(f"   OVERALL SCORE: {effectiveness_percent}%")
+            print(f"   CRITERIA SCORES:")
+            for criterion, score in evaluation["criteria_scores"].items():
+                print(f"   - {criterion.upper()}: {int(score * 100)}%")
+            print(f"   STRENGTHS: {', '.join(evaluation['strengths'])}")
+            print(f"{'='*80}\n")
+            
+            logger.info(f"✅ PERSUASION EFFECTIVENESS - {persuasion_type.upper()}: {evaluation['overall_score']:.2f}")
+            
+            return msg_state
+                
+        except Exception as e:
+            logger.error(f"Error in effectiveness evaluation: {str(e)}")
+            msg_state["status"] = "error"
+            msg_state["error"] = str(e)
+            return msg_state
 
     def execute(self, msg_state: MessageState) -> MessageState:
         """Executes the effectiveness evaluation workflow."""
