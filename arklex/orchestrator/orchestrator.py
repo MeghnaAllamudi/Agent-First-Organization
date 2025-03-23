@@ -35,6 +35,7 @@ from arklex.env.planner.function_calling import aimessage_to_dict
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+
 class AgentOrg:
     def __init__(self, config, env: Env, **kwargs):
         if isinstance(config, dict):
