@@ -18,18 +18,27 @@ CRITICAL REQUIREMENTS FOR TASK GENERATION:
    - Set "stance_confirmed" state variable to true once user position is established
    - Reference "stance_confirmed" in conditional logic for subsequent tasks
 5. For each debate interaction, explicitly include the COMPLETE cycle:
-   - READ from DebateDatabaseWorker to determine most effective persuasion technique
-   - GENERATE counter-arguments using PersuasionWorker with specific persuasion type
+   - Identify the user's persuasion strategy (logos, pathos, ethos) with ArgumentClassifier
+   - GENERATE counter-arguments using PersuasionWorker with the SAME persuasion type as the user
    - PRESENT arguments to user with MessageWorker
    - EVALUATE effectiveness with EffectivenessEvaluator after user response
    - UPDATE DebateDatabaseWorker with effectiveness scores
 6. Explicitly reference state variables in each task description:
    - stance_confirmed
-   - best_persuasion_type
-   - current_persuasion_type
-   - evaluated_effectiveness_score
-7. Each task must clearly specify which persuasion technique (logos, pathos, ethos) is being used
-8. Include tasks for adapting strategy based on which persuasion technique is most effective
+   - user_persuasion_type (the strategy the user is using)
+   - current_persuasion_type (the strategy the bot is currently using)
+   - evaluated_effectiveness_score (how effective the bot's strategy was)
+7. IMPORTANT STRATEGY CHANGE: The bot should MATCH the user's persuasion technique, not try different ones
+   - If user uses logos, bot should respond with logos
+   - If user uses pathos, bot should respond with pathos
+   - If user uses ethos, bot should respond with ethos
+8. Include tasks for tracking which persuasion technique the user employs, and adapting to match it
+9. TOPIC SELECTION HANDLING:
+   - Create a dedicated BOT_CHOOSE_TOPIC intent that activates when user asks the bot to pick a topic
+   - Connect this intent directly to a DebateRAGWorker node that selects an interesting debate topic
+   - Ensure proper flow back to the main debate cycle after topic selection
+   - Include sample utterances like "you can choose", "you decide", "pick a topic", etc.
+   - This path should bypass the normal stance confirmation flow and present a topic + request stance
 
 FORMAT REQUIREMENTS:
 1. Format as a simple array of JSON objects
@@ -41,16 +50,20 @@ FORMAT REQUIREMENTS:
 EXAMPLE TASK STRUCTURES (in valid JSON format):
 [
   {{
-    "intent": "READ_DATABASE", 
-    "task": "Read database using DebateDatabaseWorker to determine most effective persuasion technique (logos, pathos, or ethos) based on historical effectiveness scores, then store result in best_persuasion_type state variable"
+    "intent": "CLASSIFY_USER_ARGUMENT", 
+    "task": "Use ArgumentClassifier to analyze user's response and identify whether they're using logos (logical), pathos (emotional), or ethos (ethical) persuasion techniques. Store result in user_persuasion_type state variable."
   }},
   {{
     "intent": "EVALUATE_EFFECTIVENESS", 
-    "task": "Using EffectivenessEvaluator, analyze user response to the current counter-argument (using current_persuasion_type) to determine how persuasive it was. Calculate an effectiveness score (0-100) based on indicators such as user engagement, concessions made, or defensive reactions. Store result in evaluated_effectiveness_score state variable."
+    "task": "Using EffectivenessEvaluator, analyze how effective the bot's current_persuasion_type strategy was based on the user's response. Calculate an effectiveness score (0-100) and store in evaluated_effectiveness_score variable."
   }},
   {{
     "intent": "UPDATE_DATABASE", 
-    "task": "Update DebateDatabaseWorker with the evaluated_effectiveness_score for the current_persuasion_type. Record this score in the appropriate persuasion type's historical effectiveness tracking. Then query database to identify which persuasion type now has the highest cumulative effectiveness score and update best_persuasion_type for next counter-argument generation."
+    "task": "Update DebateDatabaseWorker with the evaluated_effectiveness_score for the current_persuasion_type. Then set counter_persuasion_type to MATCH the user_persuasion_type for the next response, implementing a strategy of responding with the same type of argument the user employs."
+  }},
+  {{
+    "intent": "BOT_CHOOSE_TOPIC",
+    "task": "When the user requests the bot to choose a topic (with phrases like 'you choose' or 'pick a topic'), use DebateRAGWorker to select an engaging debate topic with clear opposing perspectives, then present it to the user and ask for their stance."
   }}
 ]
 
@@ -60,15 +73,19 @@ Builder's prompt: {user_objective}
 debate_check_best_practice_sys_prompt = """You are a useful assistant to detect if the current debate task needs to be further decomposed if it cannot be solved by the provided resources. Based on the task and the current node level of the task on the tree, please output Yes if it needs to be decomposed; No otherwise. Remember that the debate opponent should always take an adversarial position opposite to the user's stance. Please also provide explanations for your choice.
 
 CRITICAL REQUIREMENTS: Every debate interaction MUST include all of the following:
-1. Database reads using DebateDatabaseWorker BEFORE generating counter-arguments to determine most effective persuasion techniques
-2. Evaluation of counter-arguments using EffectivenessEvaluator AFTER every user response
-3. Database updates using DebateDatabaseWorker AFTER every user response to track effectiveness
+1. ArgumentClassifier to identify the user's persuasion type (logos, pathos, ethos)
+2. PersuasionWorker to generate counter-arguments MATCHING the user's persuasion type
+3. Evaluation of counter-arguments using EffectivenessEvaluator AFTER every user response
+4. Database updates using DebateDatabaseWorker AFTER every user response to track effectiveness
+5. A dedicated path for BOT-INITIATED TOPIC SELECTION using DebateRAGWorker when user requests it
 
 STATE PASSING REQUIREMENTS: All persuasion state variables must be tracked between workers:
-1. DebateDatabaseWorker must set "best_persuasion_type" in state to be read by PersuasionWorker
-2. PersuasionWorker must set "current_persuasion_type" in state to be read by EffectivenessEvaluator
-3. All task graph nodes must include "persuasion_type" in their attribute fields
-4. The state variables must be explicitly passed through the task graph using variable substitution
+1. ArgumentClassifier must set "user_persuasion_type" in global state
+2. EffectivenessEvaluator must set "counter_persuasion_type" to match "user_persuasion_type" in global state
+3. PersuasionWorker must set "current_persuasion_type" in global state
+4. All task graph nodes must include appropriate operations and state variables in their attribute fields
+5. Global state must be used to pass variables between workers consistently
+6. After bot-selected topics, the "stance_confirmed" variable must be set properly once user responds
 
 Task: The current task is {task}. The current node level of the task is {level}.
 Resources: {resources}
@@ -80,19 +97,26 @@ debate_generate_best_practice_sys_prompt = """Given the task for the debate oppo
 CRITICAL WORKFLOW REQUIREMENTS:
 1. Create a DETAILED step-by-step workflow that maps EXACTLY how each worker will be used
 2. For EVERY user interaction, include this COMPLETE cycle:
-   - READ: DebateDatabaseWorker must query most effective persuasion technique BEFORE generating arguments
-   - GENERATE: PersuasionWorker must create counter-arguments using the recommended technique
+   - CLASSIFY: ArgumentClassifier must identify user's persuasion technique (logos, pathos, ethos)
+   - EVALUATE: EffectivenessEvaluator must measure how effective the bot's previous response was
+   - UPDATE: DebateDatabaseWorker must store effectiveness scores and set the next strategy to MATCH user's technique
+   - READ: DebateDatabaseWorker must confirm the persuasion technique to use for the next response
+   - GENERATE: PersuasionWorker must create counter-arguments using the same technique as the user
    - PRESENT: MessageWorker must deliver arguments to user in an adversarial manner
-   - EVALUATE: EffectivenessEvaluator must measure persuasiveness after receiving user response
-   - UPDATE: DebateDatabaseWorker must store effectiveness scores to improve future technique selection
+3. BOT-INITIATED TOPIC SELECTION:
+   - Implement a clear BOT_CHOOSE_TOPIC intent that recognizes phrases like "you choose" or "pick a topic"
+   - Connect directly to DebateRAGWorker to access knowledge base and select engaging debate topics
+   - Select balanced topics with clear opposing viewpoints from the bot's knowledge base
+   - Present the selected topic to the user with brief context and request their position
+   - Resume normal debate flow with ArgumentClassifier after user responds to the suggested topic
 
 STATE PASSING REQUIREMENTS:
 1. Each step must EXPLICITLY reference state variables with these naming conventions:
-   - best_persuasion_type: Set by DebateDatabaseWorker, read by PersuasionWorker
-   - current_persuasion_type: Set by PersuasionWorker, read by MessageWorker and EffectivenessEvaluator
-   - evaluated_effectiveness_score: Set by EffectivenessEvaluator, read by DebateDatabaseWorker
-   - [persuasion_type]_persuasion_response: Store generated responses for each technique type
-   - persuasion_effectiveness_scores: Dictionary tracking cumulative scores for each type
+   - user_persuasion_type: Set by ArgumentClassifier, read by EffectivenessEvaluator
+   - current_persuasion_type: The technique the bot is currently using, set by PersuasionWorker
+   - counter_persuasion_type: The technique the bot will use next, set to match user_persuasion_type
+   - evaluated_effectiveness_score: How effective the bot's last strategy was
+   - stance_confirmed: Boolean indicating user has stated a clear position (set after topic selection)
 
 2. Each step must clearly include:
    - Exact worker to use
@@ -101,28 +125,24 @@ STATE PASSING REQUIREMENTS:
    - Specific description of what it does
    - How it handles persuasion technique information
 
-3. EFFECTIVENESS SCORE CALCULATION AND ADAPTATION:
+3. EFFECTIVENESS EVALUATION AND ADAPTATION:
    After each user response, include these critical steps:
-   - EffectivenessEvaluator analyzes user response against current_persuasion_type
-   - Calculates effectiveness_score (0-100) based on specific metrics:
-     * Degree of engagement (did user directly address the argument?)
-     * Signs of concession (did user modify their position slightly?)
-     * Defensive reactions (did user become more entrenched?)
-     * Length and depth of response (did argument provoke substantial thought?)
-   - DebateDatabaseWorker updates history for current_persuasion_type with new score
-   - DebateDatabaseWorker recalculates which technique has highest cumulative score
-   - DebateDatabaseWorker sets best_persuasion_type for next counter-argument
+   - ArgumentClassifier identifies which technique (logos, pathos, ethos) the user is using
+   - EffectivenessEvaluator measures how effective the bot's PREVIOUS strategy was
+   - EffectivenessEvaluator sets counter_persuasion_type to MATCH user_persuasion_type
+   - DebateDatabaseWorker stores the effectiveness score for the previous strategy
+   - DebateDatabaseWorker confirms the next strategy (matching the user's technique)
+   - PersuasionWorker generates a counter-argument using the same technique as the user
 
 4. ANSWER STEP IMPLEMENTATION:
-   Include a dedicated Answer step that:
-   - Reads current effectiveness scores for all persuasion types
-   - Analyzes which technique has been most effective
-   - Explicitly selects the highest-scoring persuasion type for next counter-argument
-   - Sets next_persuasion_type state variable
-   - Provides clear reasoning about why this technique is most effective
-   - Example Answer: "Based on effectiveness metrics, pathos-based arguments (78%) have been most effective at engaging this user compared to logos (65%) and ethos (45%). The user shows more willingness to consider emotional appeals over logical arguments. Next counter-argument will use pathos persuasion technique."
+   Include a dedicated Answer step that explains:
+   - Which persuasion technique the user employed in their last response
+   - How effective the bot's previous strategy was
+   - Why the bot is now using the same technique as the user
+   - Example Answer: "User employed ethos-based arguments (ethical appeals). The bot's previous logos-based strategy had 58% effectiveness. The bot will now respond using ethos-based counter-arguments to match the user's persuasion style."
 
 5. Ensure unbroken chain of state passing between workers with no information loss
+6. Use global_state consistently to pass variables between workers
 
 RESPONSE FORMAT:
 Your response should be structured as a detailed JSON array where each object includes:
@@ -148,173 +168,41 @@ CRITICAL WORKFLOW REQUIREMENTS:
    - Create a DebateDatabaseWorker initialization step that ONLY executes after stance confirmation
    - Initialize default effectiveness scores for all persuasion types (logos, pathos, ethos)
 3. For EVERY debate cycle, include this PRECISE sequence with PROPER resource allocation:
-   - INITIAL QUERY: DebateDatabaseWorker MUST be used to determine most effective persuasion technique BEFORE any counter-argument generation
-   - GENERATION: PersuasionWorker MUST create the counter-arguments using the specific persuasion type recommended by the database
-   - PRESENTATION: MessageWorker MUST deliver these arguments to the user in an adversarial manner
-   - EVALUATION: EffectivenessEvaluator MUST measure persuasiveness after user responds
-   - DATABASE UPDATE: DebateDatabaseWorker MUST store effectiveness scores for continuous improvement
-   - ANSWER: Include reasoning about effectiveness analysis and technique selection
+   - ArgumentClassifier to identify user's persuasion strategy
+   - EffectivenessEvaluator to measure bot's previous effectiveness
+   - DebateDatabaseWorker (update) to store scores and set next strategy
+   - DebateDatabaseWorker (read) to retrieve appropriate counter strategy
+   - PersuasionWorker to generate counter-arguments using specified technique
+   - MessageWorker to deliver the counter-argument
+4. TOPIC SELECTION RESOURCE MAPPING:
+   - Map BOT_CHOOSE_TOPIC intent directly to DebateRAGWorker for topic selection
+   - Assign a high weight (5+) to this intent to prioritize it over generic responses
+   - Include comprehensive sample utterances: ["you choose", "you decide", "pick a topic", "choose for me", etc.]
+   - Create direct transition from DebateRAGWorker back to ArgumentClassifier
+   - Ensure this path bypasses normal stance checking and immediately asks for user's position on selected topic
 
-4. EFFECTIVENESS EVALUATION AND ADAPTATION:
-   Include these DETAILED steps with SPECIFIC worker configurations:
-   - EffectivenessEvaluator step:
-     * Must analyze FULL user response text
-     * Must explicitly reference current_persuasion_type
-     * Must calculate numeric score (0-100) using multiple metrics
-     * Must include specific examples of what indicates high/low effectiveness
-     * Must set evaluated_effectiveness_score state variable
-   
-   - DebateDatabaseWorker step (specifically for updating scores):
-     * Must read evaluated_effectiveness_score
-     * Must update historical record for current_persuasion_type
-     * Must recalculate which persuasion type has highest cumulative score
-     * Must update best_persuasion_type for next counter-argument
-     * Must include example SQL-like operations that would be performed
-     
-   - Answer step (specifically for effectiveness analysis):
-     * Must read all persuasion_effectiveness_scores
-     * Must analyze which technique has been most effective with this specific user
-     * Must explicitly select highest-scoring persuasion type for next counter-argument 
-     * Must provide reasoning about why this technique is most effective with this user
-     * Must link effectiveness back to specific user response patterns
+5. EFFECTIVENESS EVALUATION AND ADAPTATION:
+   - When embedding the effectiveness evaluation nodes, ENSURE:
+     * EffectivenessEvaluator calculates a numerical score for the bot's prior strategy
+     * DebateDatabaseWorker updates this score for historical tracking
+     * ArgumentClassifier correctly identifies user's current strategy
+     * EffectivenessEvaluator has precise task description setting counter_persuasion_type to MATCH user_persuasion_type
+     * PersuasionWorker's task explicitly references using the same persuasion type as the user
+     * MessageWorker includes the persuasion type information in its response
 
-ATTRIBUTE STRUCTURE REQUIREMENTS:
-1. EVERY step MUST include a detailed attribute object with these properties:
-   - task: Clear description of what this step accomplishes
-   - value: Example output this step would produce (be specific and realistic)
-   - directed: Usually false unless connections need special handling
-   - persuasion_type: Reference to the appropriate state variable or literal initial value
-   - stance_check: For stance verification steps, set to true
+6. NODE-TO-NODE CONNECTIONS:
+   - Verify that every node has clear outgoing edges for ALL possible user responses
+   - Annotate edges with appropriate intents and weights
+   - Double-check that initial stance checking edges work correctly
+   - Ensure that topic selection has a clear bridge back to main debate flow
+   - Verify that the debate cycle has proper circular connections for continued interaction
 
-2. WORKER-SPECIFIC ATTRIBUTE REQUIREMENTS:
-   - MessageWorker (stance check):
-     * operation: "stance_verification"
-     * stance_confirmed: false (initial value)
-     * action: "request_stance" or "proceed_to_debate"
-     
-   - DebateDatabaseWorker (initialize):
-     * operation: "initialize"
-     * requires_stance_confirmation: true
-     * initial_values: Default effectiveness scores
-     
-   - DebateDatabaseWorker (read): 
-     * operation: "read"
-     * persuasion_type: "logos" (initial) or state reference 
-     * purpose: "determine_best_technique"
-     * requires_stance_confirmation: true
-     
-   - PersuasionWorker:
-     * persuasion_type: Reference to best_persuasion_type state variable
-     * counter_argument_type: Specific description of counter approach
-     * adaptation_level: How this adapts based on prior effectiveness
-     * requires_stance_confirmation: true
-     
-   - MessageWorker (debate):
-     * persuasion_type: Reference to current_persuasion_type
-     * delivery_style: "adversarial"
-     * tone: Matches the persuasion type (logical, emotional, authoritative)
-     * requires_stance_confirmation: true
-     
-   - EffectivenessEvaluator:
-     * persuasion_type: Reference to current_persuasion_type
-     * effectiveness_tracking: true
-     * metrics: Array of evaluation criteria ["engagement_level", "concessions_made", "defensive_reactions", "response_depth"]
-     * score_calculation: "weighted_average"
-     * requires_stance_confirmation: true
-     
-   - DebateDatabaseWorker (update):
-     * operation: "update"
-     * persuasion_type: Reference to current_persuasion_type
-     * score: Reference to evaluated_effectiveness_score
-     * improvement_purpose: "refine_future_technique_selection"
-     * update_operations: ["record_score", "recalculate_best_technique", "update_best_type"]
-     * requires_stance_confirmation: true
-     
-   - Answer (effectiveness analysis):
-     * operation: "technique_selection_reasoning"
-     * all_persuasion_scores: Reference to persuasion_effectiveness_scores
-     * selected_technique: Reference to best_persuasion_type
-     * reasoning_depth: "detailed"
-     * adaptation_strategy: "responsive_to_user_patterns"
-     * requires_stance_confirmation: true
-
-3. RESPONSE STRUCTURE:
-Include for each step:
-   - step: Number
-   - task: Detailed description
-   - resource: Worker name
-   - resource_id: Unique ID
-   - example_response: Realistic example of what this worker would output
-   - attribute: Complete attribute object with ALL required fields for that worker type
-   - conditional_execution: For steps that depend on stance confirmation, specify condition
-
-EXAMPLE EFFECTIVENESS EVALUATION STEP:
-```
-{{
-  "step": 5,
-  "task": "Evaluate effectiveness of logos-based counter-argument based on user's response",
-  "resource": "EffectivenessEvaluator",
-  "resource_id": "effectiveness_evaluator_1",
-  "example_response": "Effectiveness analysis complete. The logos-based argument received a score of 75/100 based on: high engagement (user directly addressed logical points), moderate concessions (user acknowledged some factual points), low defensive reactions (user remained calm and rational), high response depth (user provided detailed counter-examples).",
-  "attribute": {{
-    "task": "Evaluate persuasiveness of current counter-argument",
-    "value": "Effectiveness score: 75/100",
-    "directed": false,
-    "persuasion_type": "$current_persuasion_type",
-    "effectiveness_tracking": true,
-    "metrics": ["engagement_level", "concessions_made", "defensive_reactions", "response_depth"],
-    "score_calculation": "weighted_average",
-    "requires_stance_confirmation": true
-  }},
-  "conditional_execution": "stance_confirmed == true"
-}}
-```
-
-EXAMPLE DATABASE UPDATE STEP:
-```
-{{
-  "step": 6,
-  "task": "Update database with effectiveness score for logos persuasion and determine most effective technique for next argument",
-  "resource": "DebateDatabaseWorker",
-  "resource_id": "debate_database_worker_3",
-  "example_response": "Database updated with effectiveness score 75 for logos persuasion type. Recalculated cumulative scores: logos (75), pathos (50), ethos (40). Best technique for next argument: logos.",
-  "attribute": {{
-    "task": "Update persuasion type effectiveness scores",
-    "value": "Updated scores: logos (75), pathos (50), ethos (40). Best: logos",
-    "directed": false,
-    "operation": "update",
-    "persuasion_type": "$current_persuasion_type",
-    "score": "$evaluated_effectiveness_score",
-    "improvement_purpose": "refine_future_technique_selection",
-    "update_operations": ["record_score", "recalculate_best_technique", "update_best_type"],
-    "requires_stance_confirmation": true
-  }},
-  "conditional_execution": "stance_confirmed == true"
-}}
-```
-
-EXAMPLE ANSWER STEP:
-```
-{{
-  "step": 7,
-  "task": "Analyze effectiveness patterns and provide reasoning for selected persuasion technique",
-  "resource": "Answer",
-  "resource_id": "answer_1",
-  "example_response": "Effectiveness Analysis: Based on user response patterns, logos-based arguments have been most effective (75% effective) compared to pathos (50%) and ethos (40%). The user consistently engages more deeply with logical points, offers counterexamples, and shows willingness to consider factual evidence. Their response length and depth increases significantly when presented with data-driven arguments. Next counter-argument will continue using logos as the primary persuasion technique, with focus on statistical evidence and causal relationships.",
-  "attribute": {{
-    "task": "Provide reasoning for persuasion technique selection",
-    "value": "Selected technique: logos (75% effective) - User shows stronger engagement with logical arguments",
-    "directed": false,
-    "operation": "technique_selection_reasoning",
-    "all_persuasion_scores": "$persuasion_effectiveness_scores",
-    "selected_technique": "$best_persuasion_type",
-    "reasoning_depth": "detailed",
-    "adaptation_strategy": "responsive_to_user_patterns",
-    "requires_stance_confirmation": true
-  }},
-  "conditional_execution": "stance_confirmed == true"
-}}
-```
+WORKER INITIALIZATION REQUIREMENTS:
+1. Configure DebateRAGWorker with diverse, balanced debate topics
+2. Ensure DebateMessageWorker has clear instructions on formatting persuasion types
+3. Provide ArgumentClassifier with guidelines for detecting logos, pathos, and ethos
+4. Set up EffectivenessEvaluator with criteria for measuring argument impact
+5. Initialize DebateDatabaseWorker with proper effectiveness tracking
 
 Resources: {resources}
 Best Practice: {best_practice}
@@ -348,4 +236,44 @@ Start Message:
 
 Builder's prompt: The builder want to create a chatbot - {role}. {user_objective}
 Start Message:
+""" 
+
+# Argument classifier prompt to analyze user messages into argument types
+argument_classifier_prompt = """Analyze the following message and classify it as emotional (pathos), logical (logos), or ethical (ethos).
+
+User message: {message}
+
+Respond with a valid JSON object in this format:
+{{
+    "dominant_type": "emotional|logical|ethical",
+    "secondary_types": ["list other types that apply"],
+    "confidence": 0.0-1.0,
+    "reasoning": "brief explanation of classification",
+    "persuasion_indicators": {{
+        "emotional": 0.0-1.0,
+        "logical": 0.0-1.0,
+        "ethical": 0.0-1.0
+    }}
+}}"""
+
+# Add a new prompt for updating worker files with proper logging
+
+debate_worker_logging_template = """
+# Worker Header Template - Add to each worker file
+
+def execute(self, state: MessageState) -> MessageState:
+    \"\"\"Worker's primary execution function.\"\"\"
+    # Clear worker identification in logs
+    print("\\n================================================================================")
+    print(f"🔄 {self.__class__.__name__.upper()} EXECUTING")
+    print(f"================================================================================\\n")
+    
+    # Worker-specific processing here
+    
+    # Add completion log
+    print(f"\\n================================================================================")
+    print(f"✅ {self.__class__.__name__.upper()} COMPLETED")
+    print(f"================================================================================\\n")
+    
+    return state
 """ 

@@ -4,16 +4,26 @@ from langgraph.graph import StateGraph, START
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
 from arklex.env.workers.worker import BaseWorker, register_worker
-from arklex.env.prompts import load_prompts
 from arklex.env.tools.utils import ToolGenerator
 from arklex.env.tools.database.utils import DatabaseActions
 from arklex.utils.utils import chunk_string
 from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
 
+# Import from prompts_for_debate_opp
+import importlib.util
+import os
+import sys
 
+# Get the path to the root directory
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+sys.path.insert(0, root_dir)
+
+# Import the prompts from prompts_for_debate_opp.py
+spec = importlib.util.spec_from_file_location("debate_prompts", os.path.join(root_dir, "prompts_for_debate_opp.py"))
+debate_prompts = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(debate_prompts)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +62,7 @@ class DataBaseWorker(BaseWorker):
         actions_info = "\n".join([f"{name}: {description}" for name, description in self.actions.items()])
         actions_name = ", ".join(self.actions.keys())
 
-        prompts = load_prompts(msg_state["bot_config"])
+        prompts = debate_prompts.load_prompts(msg_state["bot_config"])
         prompt = PromptTemplate.from_template(prompts["database_action_prompt"])
         input_prompt = prompt.invoke({"user_intent": user_intent, "actions_info": actions_info, "actions_name": actions_name})
         chunked_prompt = chunk_string(input_prompt.text, tokenizer=MODEL["tokenizer"], max_length=MODEL["context"])

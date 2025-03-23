@@ -15,81 +15,61 @@
     "tasks": [],
     "workers": [
         {
+            "id": "4421de07-a43c-4589-a1d2-f4b86492aea8",
+            "name": "DebfaultWorker",
+            "path": "default_worker.py"
+        },
+        {
             "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
             "name": "DebateRAGWorker",
-            "path": "debate_rag_worker.py",
-            "type": "rag",
-            "config": "{\"rag_path\": \"debate_topics\", \"topics\": [\"Artificial intelligence ethics\", \"Climate change policy\", \"Social media impact\", \"Technology and society\", \"Economic policy\", \"Social justice\", \"Scientific advancement\"], \"topic_categories\": [\"Technology\", \"Environment\", \"Society\", \"Education\", \"Health\", \"Politics\", \"Ethics\", \"Science\"], \"argument_structure\": {\"pro_arguments\": true, \"con_arguments\": true, \"evidence_required\": true, \"counterpoints\": true}, \"format\": \"question_based\", \"source\": \"kialo_edu\"}"
+            "path": "debate_rag_worker.py"
         },
         {
             "id": "1521f4a2-f699-4c41-a751-274d30f4c171",
             "name": "ArgumentClassifier",
-            "type": "analysis",
-            "path": "argument_classifier.py",
-            "config": "{\"classification_types\": [\"logical\", \"emotional\", \"ethical\"]}",
-            "description": "Classifies arguments into emotional, logical, or ethical categories"
+            "path": "argument_classifier.py"
         },
         {
             "id": "ffb5faac-60c3-46a9-b116-d833d5a7bfa1",
             "name": "PersuasionWorker",
-            "type": "persuasion",
-            "path": "persuasion_worker.py",
-            "config": "{\"techniques\": [\"logos\", \"pathos\", \"ethos\"]}",
-            "description": "Generates counter-arguments using appropriate persuasion techniques"
+            "path": "persuasion_worker.py"
         },
         {
             "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
             "name": "DebateMessageWorker",
-            "type": "base",
-            "path": "debate_message_worker.py",
-            "config": "{}",
-            "description": "Specialized worker that delivers debate responses using the most effective persuasion strategy"
+            "path": "debate_message_worker.py"
         },
         {
             "id": "70ba6243-0a95-4c9f-8578-4c543ab7a429",
             "name": "EffectivenessEvaluator",
-            "type": "evaluation",
-            "path": "effectiveness_evaluator.py",
-            "config": "{\"evaluation_metrics\": [\"persuasiveness\", \"logical_coherence\", \"emotional_impact\"]}",
-            "description": "Evaluates the effectiveness of counter-arguments"
+            "path": "effectiveness_evaluator.py"
         },
         {
             "id": "38a3c397-e6d8-4543-aa75-357d7a5bef54",
             "name": "DebateDatabaseWorker",
-            "type": "database",
-            "path": "debate_database_worker.py",
-            "config": "{}",
-            "description": "Manages database operations for tracking and recommending persuasion techniques"
+            "path": "debate_database_worker.py"
         }
     ],
     "tools": [
         {
-            "id": "4df23da4-fae3-4e06-8efc-9296f17e8ece",
-            "name": "argument_validation_tool",
-            "path": "argument_validation_tool.py",
-            "description": "Validates argument structure and identifies logical fallacies",
-            "config": "{}"
+            "id": "9a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+            "name": "read_debate_history",
+            "path": "debate_db/read_debate_history.py"
         },
         {
-            "id": "7519c074-4cb2-4102-ba58-b2213159863f",
-            "name": "json_parsing_tool",
-            "path": "json_parsing_tool.py",
-            "description": "Parses JSON responses for structured data handling",
-            "config": "{}"
+            "id": "b2c3d4e5-f6g7-h8i9-j0k1-l2m3n4o5p6q7",
+            "name": "store_debate_record",
+            "path": "debate_db/store_debate_record.py"
         },
         {
-            "id": "7c163c3c-3a25-4252-91d5-aade341668f9",
-            "name": "technique_formatting_tool",
-            "path": "technique_formatting_tool.py",
-            "description": "Formats persuasion techniques for effective delivery",
-            "config": "{}"
+            "id": "c3d4e5f6-g7h8-i9j0-k1l2-m3n4o5p6q7r8",
+            "name": "update_debate_record",
+            "path": "debate_db/update_debate_record.py"
         },
         {
-            "id": "451d1f0d-eb4f-4cd0-aa71-2416049e8992",
-            "name": "error_handling_tool",
-            "path": "error_handling_tool.py",
-            "description": "Handles errors and exceptions during debate flow",
-            "config": "{}"
+            "id": "d4e5f6g7-h8i9-j0k1-l2m3-n4o5p6q7r8s9",
+            "name": "get_persuasion_stats",
+            "path": "debate_db/get_persuasion_stats.py"
         }
     ]
 } 

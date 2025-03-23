@@ -27,10 +27,6 @@ from arklex.env.workers.argument_classifier import ArgumentClassifier
 from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
 from arklex.env.workers.debate_history_worker import DebateHistoryWorker
 from arklex.env.workers.debate_database_worker import DebateDatabaseWorker
-from arklex.env.tools.json_parsing_tool import JSONParsingTool
-from arklex.env.tools.error_handling_tool import ErrorHandlingTool
-from arklex.env.tools.argument_validation_tool import ArgumentValidationTool
-from arklex.env.tools.technique_formatting_tool import TechniqueFormattingTool
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
@@ -71,6 +67,9 @@ def init_worker(args):
     # Load config
     config = json.load(open(args.config))
     
+    # Check if this is a debate-related config
+    is_debate_config = "debate" in os.path.basename(args.config).lower()
+    
     # Create output directory
     create_output_dir(args.output_dir)
     
@@ -79,43 +78,70 @@ def init_worker(args):
     
     # Initialize workers
     for worker_config in config["workers"]:
-        worker_type = worker_config["type"]
-        worker_id = worker_config["id"]
         worker_name = worker_config["name"]
+        worker_id = worker_config["id"]
         
-        # Parse the config if it's a string
-        if isinstance(worker_config["config"], str):
-            worker_config["config"] = json.loads(worker_config["config"])
-        
-        if worker_type == "database" or worker_name == "DebateDatabaseWorker":
-            worker = DebateDatabaseWorker(worker_config["config"])
-        elif worker_name == "PersuasionWorker":
-            persuasion_tools = {
-                "validation_tool": tools_dict["argument_validation_tool"],
-                "json_tool": tools_dict["json_parsing_tool"],
-                "technique_tool": tools_dict["technique_formatting_tool"],
-                "error_tool": tools_dict["error_handling_tool"]
-            }
-            worker = PersuasionWorker(config=worker_config["config"])
-        elif worker_type == "rag":
-            worker = DebateRAGWorker()
-        elif worker_type == "base":
-            worker = MessageWorker()  # No config needed
-        elif worker_type == "base_def":
-            worker = DefaultWorker()
-        elif worker_type == "analysis":
-            if worker_name == "DebateHistoryAnalyzer":
-                logger.warning(f"DebateHistoryAnalyzer has been removed, skipping worker: {worker_name}")
-                continue
+        # For debate configs, initialize based on worker name, not type
+        if is_debate_config:
+            if worker_name == "DebateDatabaseWorker":
+                worker = DebateDatabaseWorker({})
+            elif worker_name == "PersuasionWorker":
+                worker = PersuasionWorker({})
+            elif worker_name == "DebateRAGWorker":
+                worker = DebateRAGWorker()
+            elif worker_name == "DebateMessageWorker" or worker_name == "MessageWorker":
+                worker = MessageWorker()
+            elif worker_name == "DefaultWorker":
+                worker = DefaultWorker()
+            elif worker_name == "ArgumentClassifier":
+                worker = ArgumentClassifier({})
+            elif worker_name == "EffectivenessEvaluator":
+                worker = EffectivenessEvaluator({})
+            elif worker_name == "DebateHistoryWorker":
+                worker = DebateHistoryWorker()
+            elif worker_name == "DefaultWorker": 
+                worker = DefaultWorker()
             else:
-                worker = ArgumentClassifier(worker_config["config"])
-        elif worker_type == "evaluation":
-            worker = EffectivenessEvaluator(worker_config["config"])
-        elif worker_type == "history":
-            worker = DebateHistoryWorker()
+                logger.warning(f"Unknown worker name for debate config: {worker_name}")
+                continue
         else:
-            logger.warning(f"Unknown worker type: {worker_type}")
-            continue
+            # Original initialization code for non-debate configs
+            worker_type = worker_config.get("type", "")
+            
+            # Parse the config if it's a string
+            worker_config_data = {}
+            if "config" in worker_config:
+                if isinstance(worker_config["config"], str):
+                    try:
+                        worker_config_data = json.loads(worker_config["config"])
+                    except:
+                        worker_config_data = {}
+                else:
+                    worker_config_data = worker_config["config"]
+            
+            if worker_type == "database" or worker_name == "DebateDatabaseWorker":
+                worker = DebateDatabaseWorker(worker_config_data)
+            elif worker_name == "PersuasionWorker":
+                worker = PersuasionWorker(config=worker_config_data)
+            elif worker_type == "rag":
+                worker = DebateRAGWorker()
+            elif worker_type == "base":
+                worker = MessageWorker()  # No config needed
+            elif worker_type == "base_def":
+                worker = DefaultWorker()
+            elif worker_type == "analysis":
+                if worker_name == "DebateHistoryAnalyzer":
+                    logger.warning(f"DebateHistoryAnalyzer has been removed, skipping worker: {worker_name}")
+                    continue
+                else:
+                    worker = ArgumentClassifier(worker_config_data)
+            elif worker_type == "evaluation":
+                worker = EffectivenessEvaluator(worker_config_data)
+            elif worker_type == "history":
+                worker = DebateHistoryWorker()
+            else:
+                logger.warning(f"Unknown worker type: {worker_type}")
+                continue
             
         # Set worker name to match ID
         worker.name = worker_id
