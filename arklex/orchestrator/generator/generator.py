@@ -1,3 +1,4 @@
+
 import os
 import json
 import argparse
@@ -10,7 +11,6 @@ from pathlib import Path
 import inspect
 import importlib
 from typing import Optional
-from copy import deepcopy
 
 from langchain.prompts import PromptTemplate
 from langchain_openai.chat_models import ChatOpenAI
@@ -166,13 +166,13 @@ class TaskEditorApp(App):
 
 
 class Generator:
-    def __init__(self, args, config, model, output_dir, resource_inizializer: Optional[BaseResourceInitializer] = None):
+    def __init__(self, args, config, model, output_dir, resource_inizializer: Optional[BaseResourceInitializer]  = None):
         if resource_inizializer is None:
             resource_inizializer = DefaulResourceInitializer()
         self.args = args
         self.product_kwargs = json.load(open(config))
         self.role = self.product_kwargs.get("role")
-        self.user_objective = self.product_kwargs.get("user_objective")
+        self.u_objective = self.product_kwargs.get("user_objective")
         self.b_objective = self.product_kwargs.get("builder_objective")
         self.intro = self.product_kwargs.get("intro")
         self.task_docs = self.product_kwargs.get("task_docs") 
@@ -183,26 +183,12 @@ class Generator:
         self.model = model
         self.timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         self.output_dir = output_dir
-        
-        self.generate_tasks_prompt = PromptTemplate(
-            template=generate_tasks_sys_prompt,
-            input_variables=["role", "user_objective", "intro", "docs"]
-        )
-        
-        self.generate_best_practice_prompt = PromptTemplate(
-            template=generate_best_practice_sys_prompt,
-            input_variables=["role", "user_objective", "task", "resources"]
-        )
-        
-        self.generate_start_msg_prompt = PromptTemplate(
-            template=generate_start_msg,
-            input_variables=["role", "user_objective"]
-        )
     
     
     def _generate_tasks(self):
         # based on the type and documents
-        input_prompt = self.generate_tasks_prompt.invoke({"role": self.role, "user_objective": self.user_objective, "intro": self.intro, "docs": self.documents})
+        prompt = PromptTemplate.from_template(generate_tasks_sys_prompt)
+        input_prompt = prompt.invoke({"role": self.role, "u_objective": self.u_objective, "intro": self.intro, "docs": self.documents})
         final_chain = self.model | StrOutputParser()
         answer = final_chain.invoke(input_prompt)
         logger.debug(f"Generated tasks with thought: {answer}")
@@ -253,7 +239,8 @@ class Generator:
             return best_practice
         
         # Best practice suggestion
-        input_prompt = self.generate_best_practice_prompt.invoke({"role": self.role, "user_objective": self.user_objective, "task": task["task"], "resources": resources_str})
+        prompt = PromptTemplate.from_template(generate_best_practice_sys_prompt)
+        input_prompt = prompt.invoke({"role": self.role, "u_objective": self.u_objective, "task": task["task"], "resources": resources_str})
         final_chain = self.model | StrOutputParser()
         answer = final_chain.invoke(input_prompt)
         logger.debug(f"Generated best practice with thought: {answer}")
@@ -360,7 +347,8 @@ class Generator:
         start_node = []
         start_node.append("0")
         # generate the start message
-        input_prompt = self.generate_start_msg_prompt.invoke({"role": self.role, "user_objective": self.user_objective})
+        prompt = PromptTemplate.from_template(generate_start_msg)
+        input_prompt = prompt.invoke({"role": self.role, "u_objective": self.u_objective})
         final_chain = self.model | StrOutputParser()
         answer = final_chain.invoke(input_prompt)
         start_msg = postprocess_json(answer)
@@ -481,4 +469,3 @@ class Generator:
             json.dump(task_graph, f, indent=4)
 
         return taskgraph_filepath
-        
