@@ -24,9 +24,8 @@ from arklex.env.workers.message_worker import MessageWorker
 from arklex.env.workers.default_worker import DefaultWorker
 from arklex.env.workers.persuasion_worker import PersuasionWorker
 from arklex.env.workers.argument_classifier import ArgumentClassifier
-from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
-from arklex.env.workers.debate_history_worker import DebateHistoryWorker
 from arklex.env.workers.debate_database_worker import DebateDatabaseWorker
+from examples.debate_opponent_tests.test_debate_workers import EffectivenessEvaluator
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
@@ -83,10 +82,10 @@ def init_worker(args):
         
         # For debate configs, initialize based on worker name, not type
         if is_debate_config:
-            if worker_name == "DebateDatabaseWorker":
-                worker = DebateDatabaseWorker({})
-            elif worker_name == "PersuasionWorker":
-                worker = PersuasionWorker({})
+            # if worker_name == "DebateDatabaseWorker":
+            #     worker = DebateDatabaseWorker()
+            if worker_name == "PersuasionWorker":
+                worker = PersuasionWorker()
             elif worker_name == "DebateRAGWorker":
                 worker = DebateRAGWorker()
             elif worker_name == "DebateMessageWorker" or worker_name == "MessageWorker":
@@ -94,13 +93,9 @@ def init_worker(args):
             elif worker_name == "DefaultWorker":
                 worker = DefaultWorker()
             elif worker_name == "ArgumentClassifier":
-                worker = ArgumentClassifier({})
+                worker = ArgumentClassifier()
             elif worker_name == "EffectivenessEvaluator":
-                worker = EffectivenessEvaluator({})
-            elif worker_name == "DebateHistoryWorker":
-                worker = DebateHistoryWorker()
-            elif worker_name == "DefaultWorker": 
-                worker = DefaultWorker()
+                worker = EffectivenessEvaluator()
             else:
                 logger.warning(f"Unknown worker name for debate config: {worker_name}")
                 continue
@@ -119,29 +114,6 @@ def init_worker(args):
                 else:
                     worker_config_data = worker_config["config"]
             
-            if worker_type == "database" or worker_name == "DebateDatabaseWorker":
-                worker = DebateDatabaseWorker(worker_config_data)
-            elif worker_name == "PersuasionWorker":
-                worker = PersuasionWorker(config=worker_config_data)
-            elif worker_type == "rag":
-                worker = DebateRAGWorker()
-            elif worker_type == "base":
-                worker = MessageWorker()  # No config needed
-            elif worker_type == "base_def":
-                worker = DefaultWorker()
-            elif worker_type == "analysis":
-                if worker_name == "DebateHistoryAnalyzer":
-                    logger.warning(f"DebateHistoryAnalyzer has been removed, skipping worker: {worker_name}")
-                    continue
-                else:
-                    worker = ArgumentClassifier(worker_config_data)
-            elif worker_type == "evaluation":
-                worker = EffectivenessEvaluator(worker_config_data)
-            elif worker_type == "history":
-                worker = DebateHistoryWorker()
-            else:
-                logger.warning(f"Unknown worker type: {worker_type}")
-                continue
             
         # Set worker name to match ID
         worker.name = worker_id
