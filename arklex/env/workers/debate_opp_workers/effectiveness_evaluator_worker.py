@@ -90,8 +90,7 @@ class EffectivenessEvaluator(BaseWorker):
         - Qualified agreement ("yes, but...")
         - Complete rejection or topic changes (indicates low effectiveness)
         
-        Format your response as JSON with the following fields:
-        - effectiveness_score: number between 0-100
+        Give just the number for the effectiveness score between 0-100. 
         """
         
         
@@ -99,24 +98,14 @@ class EffectivenessEvaluator(BaseWorker):
         response = self.llm.invoke(evaluation_prompt)
         result_text = response.content.strip()
         
-        # Extract the JSON portion from the response
-        json_match = re.search(r'({.*})', result_text, re.DOTALL)
-        if json_match:
-            result_json = json.loads(json_match.group(1))
-        else:
-            # Try to parse the entire response as JSON
-            result_json = json.loads(result_text)
-        
         # Ensure the score is a float between 0 and 100
-        score = float(result_json.get("effectiveness_score", 50.0))
-        score = max(0.0, min(100.0, score))
+        score = float(result_text)
         
-        # Scale score to 0-1 range for database
-        normalized_score = score / 100.0
+        state["effectiveness_score"] = score
         
-        state["effectiveness_score"] = normalized_score
-            
-        
+        print("EFFECTIVENESS EVALUATOR")
+        print(f"effective_score: {state['effectiveness_score']}")
+        print("==========================================================")
         
     def _create_action_graph(self):
         """Create a processing flow for effectiveness evaluation."""

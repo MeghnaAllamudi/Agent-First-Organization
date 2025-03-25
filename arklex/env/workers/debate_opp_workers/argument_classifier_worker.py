@@ -52,13 +52,14 @@ class ArgumentClassifier(BaseWorker):
 
     def _classify_arguments(self, state: MessageState):
         """Classifies all arguments in the state using llm."""
+        
         user_classification_prompt = f"""
             Analyze the following argument and classify it as primarily using one of these persuasion types:
             - pathos: Appeals to emotion, feelings, and personal experience
             - logos: Appeals to logic, facts, data, and rational thinking
             - ethos: Appeals to credibility, authority, ethics, and moral principles
             
-            Argument: {state['user_message'].message}
+            Argument: {state["user_message"].message}
             
             Please respond with a single word: pathos, logos, or ethos.
             """
@@ -69,7 +70,7 @@ class ArgumentClassifier(BaseWorker):
             - logos: Appeals to logic, facts, data, and rational thinking
             - ethos: Appeals to credibility, authority, ethics, and moral principles
             
-            Argument: {state['response'].message}
+            Argument: {state["orchestrator_message"].message}
             
             Please respond with a single word: pathos, logos, or ethos.
             """
@@ -86,7 +87,13 @@ class ArgumentClassifier(BaseWorker):
         
         state["user_classification"] = user_result_text
         state["bot_classification"] = bot_result_text
-         
+        
+        print("ARGUMENT CLASSIFIER")
+        print("user_message: " + state["user_message"].message)
+        print("bot_message: " + state["orchestrator_message"].message)
+        print("user_classification: " + state["user_classification"])
+        print("bot_classification: " + state["bot_classification"]) 
+        print("==========================================================")
         
     def _create_action_graph(self):
         """Creates the action graph for argument classification."""

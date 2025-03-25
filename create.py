@@ -70,7 +70,9 @@ def init_worker(args):
                 worker = PersuasionWorker()
             elif worker_name == "DebateRAGWorker":
                 worker = DebateRAGWorker()
-            elif worker_name == "DebateMessageWorker" or worker_name == "MessageWorker":
+            elif worker_name == "MessageWorker": 
+                worker = MessageWorker()
+            elif worker_name == "DebateMessageWorker":
                 worker = DebateMessageWorker()
             elif worker_name == "DefaultWorker":
                 worker = DefaultWorker()

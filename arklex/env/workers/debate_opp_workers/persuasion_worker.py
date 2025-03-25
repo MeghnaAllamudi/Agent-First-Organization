@@ -82,7 +82,7 @@ class PersuasionWorker(BaseWorker):
         PERSUASION STRATEGY: Your counter-argument should primarily use {classification_to_use}-based persuasion, which focuses on {persuasion_descriptions.get(classification_to_use, "balanced reasoning")}.
 
         EFFECTIVENESS ANALYSIS: The effectiveness score of your previous argument was {effectiveness_score*100:.0f}%. 
-        {"Since this was less than 50%, you need to adapt by matching the user's persuasion style." if effectiveness_score < 0.5 else "Since this was effective, you should continue with your current persuasion approach."}
+        {"Since this was less than 50, you need to adapt by matching the user's persuasion style." if effectiveness_score < 0.5 else "Since this was effective, you should continue with your current persuasion approach."}
 
         Guidelines:
         1. Address specific points from the user's argument
@@ -102,6 +102,10 @@ class PersuasionWorker(BaseWorker):
         state["new_counter_argument"] = counter_argument
         state["persuasion_strategy_used"] = classification_to_use
         
+        print("PERSUASION_WORKER")
+        print("classification to use: " + classification_to_use)
+        print("==========================================================")
+        
     def _create_action_graph(self):
         """Create a processing flow for persuasion strategy."""
         workflow = StateGraph(MessageState)
@@ -115,41 +119,10 @@ class PersuasionWorker(BaseWorker):
         return workflow
         
     def execute(self, msg_state: MessageState):
-        """
-        Executes the persuasion worker to generate a counter-argument.
         
-        Args:
-            msg_state: The current message state
-            
-        Returns:
-            Updated message state with new counter-argument
-        """
-        try:
-            # Create and compile the action graph
-            graph = self._create_action_graph().compile()
-            
-            # Execute the graph
-            result = graph.invoke(msg_state)
-            
-            # Ensure the counter-argument is properly added to the state
-            if "new_counter_argument" in result:
-                # Update the response in the state
-                if "response" in result and isinstance(result["response"], dict):
-                    result["response"]["message"] = result["new_counter_argument"]
-                else:
-                    result["response"] = {"message": result["new_counter_argument"]}
-                
-                logger.info(f"Generated new counter-argument using {result.get('persuasion_strategy_used', 'unknown')} strategy")
-            else:
-                logger.warning("Failed to generate a new counter-argument")
-                
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in PersuasionWorker: {str(e)}")
-            logger.error(traceback.format_exc())
-            return msg_state
-    
+        graph = self._create_action_graph().compile()
+        result = graph.invoke(msg_state)
+        return result 
     
 # Register the effectiveness evaluator worker
 register_worker(PersuasionWorker) 
