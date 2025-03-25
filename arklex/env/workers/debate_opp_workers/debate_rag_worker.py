@@ -4,6 +4,7 @@ import random
 import os
 import pickle
 from pathlib import Path
+from datetime import datetime
 
 from langgraph.graph import StateGraph, START
 from langchain.prompts import PromptTemplate
@@ -44,12 +45,7 @@ class DebateRAGWorker(BaseWorker):
                     with open(filepath, "rb") as f:
                         self.documents = pickle.load(f)
                     logger.info(f"Loaded {len(self.documents)} RAG documents")
-                    
-                    # Check if these are debate topic URLs
-                    debate_urls = [doc.url for doc in self.documents 
-                                  if "kialo-edu.com/debate-topics-and-argumentative-essay-topics" in doc.url]
-                    logger.info(f"Found {len(debate_urls)} debate topic URLs out of {len(self.documents)} total documents")
-                    break
+
                 except Exception as e:
                     logger.error(f"Error loading RAG documents from {filepath}: {str(e)}")
         
@@ -64,10 +60,11 @@ class DebateRAGWorker(BaseWorker):
             Context: {context}
             
             Generate a response that includes:
-            1. Main argument
-            2. Supporting evidence
-            3. Counterarguments
-            4. Rebuttals
+            1. The topic of debate 
+            2. The stance that you are taking 
+            3. One argument in support of it that falls under logos persusaive strategy
+            
+            Keep this to a maximum of 50 words
             
             Response:"""
         )
@@ -86,53 +83,38 @@ class DebateRAGWorker(BaseWorker):
             if not self.documents:
                 raise Exception("No documents available for debate topics")
             
-            # Filter for debate topic documents
-            debate_topic_docs = [doc for doc in self.documents 
-                              if "kialo-edu.com/debate-topics-and-argumentative-essay-topics" in doc.url]
-            
-            # If we have debate topics, use those; otherwise, fall back to all documents
-            if debate_topic_docs:
-                logger.info(f"Found {len(debate_topic_docs)} debate topic documents")
-                # Exclude the main debate topics page as it's not a specific topic
-                topic_docs = [doc for doc in debate_topic_docs 
-                             if "kialo-edu.com/debate-topics-and-argumentative-essay-topics/" != doc.url and
-                                doc.url.endswith('/')]
-                
-                if not topic_docs:
-                    # If filtering removed all, use all debate docs
-                    topic_docs = debate_topic_docs
-            else:
-                logger.warning("No specific debate topic documents found. Using all available documents.")
-                topic_docs = self.documents
-                
-            # Select a random topic document
-            topic_doc = random.choice(topic_docs)
+            # Simplified approach: just pick a random document
+            topic_doc = random.choice(self.documents)
             logger.info(f"Selected random topic URL: {topic_doc.url}")
             
             # Process the topic content
             topic_content = topic_doc.content.split('\n')
             
-            # Get topic name and arguments
-            topic_name = None
+            # Extract a topic name from the first non-empty line or URL
             for line in topic_content:
-                if line and not line.startswith('PRO:') and not line.startswith('CON:'):
-                    topic_name = line
+                if line and line.strip():
+                    topic_name = line.strip()
                     break
-                    
-            if not topic_name:
-                topic_name = topic_doc.url.split('/')[-1]
-                
-            arguments = []
+            else:
+                # Fallback if no content found
+                topic_name = topic_doc.url.split('/')[-1].replace('-', ' ').title()
             
-            for line in topic_content:
-                if line.startswith('PRO:') or line.startswith('CON:'):
-                    arg_content = line.split(':', 1)[1].strip()
-                    arguments.append(arg_content)
+            # Store the topic in the state for later reference
+            msg_state["topic"] = topic_name
+            logger.info(f"Selected debate topic: {topic_name}")
+            
+            # Make sure topic has reasonable length
+            if len(topic_name) > 100:
+                topic_name = topic_name[:100] + "..."
+                
+            # Get all non-empty lines as context
+            context_lines = [line for line in topic_content if line and line.strip()]
+            context = "\n".join(context_lines[:20])  # Limit to 20 lines
             
             # Format the response using the debate prompt
             formatted_response = self.debate_prompt.format(
                 topic=topic_name,
-                context="\n".join(arguments)
+                context=context
             )
             
             # Generate the final response
@@ -141,23 +123,20 @@ class DebateRAGWorker(BaseWorker):
             
             # Update the state with the formatted response
             msg_state["message_flow"] = response
+            msg_state["bot_message"] = response  # Store the full response instead of just the first 10 characters
+            msg_state["response"] = response   # Set response field too for completeness
+            
             logger.info("Debate processing completed successfully")
+            
+            print("RAG")
+            print("bot_message: " + msg_state["bot_message"])
+            print("==========================================================")
             
         except Exception as e:
             logger.error(f"Error in debate processing: {str(e)}", exc_info=True)
             return self._handle_error(msg_state)
             
         return msg_state
-
-    def _handle_error(self, state: MessageState) -> MessageState:
-        """Handles errors in debate processing."""
-        logger.error("Handling error state")
-        if hasattr(self, 'tools') and self.tools and "error_tool" in self.tools:
-            error_response = self.tools["error_tool"].create_error_response("rag")
-            state["message_flow"] = error_response.get("message", "An error occurred while processing the response.")
-        else:
-            state["message_flow"] = "I'm sorry, but I couldn't find a suitable debate topic at the moment. Could you suggest a topic you'd like to discuss?"
-        return state 
 
     def _create_action_graph(self) -> StateGraph:
         """Creates the action graph for debate handling."""
@@ -170,3 +149,20 @@ class DebateRAGWorker(BaseWorker):
         graph = self.action_graph.compile()
         result = graph.invoke(state)
         return result
+
+    def _handle_error(self, state: MessageState) -> MessageState:
+        """Handles errors in debate processing."""
+        logger.error("Handling error state")
+        error_message = ""
+        if hasattr(self, 'tools') and self.tools and "error_tool" in self.tools:
+            error_response = self.tools["error_tool"].create_error_response("rag")
+            error_message = error_response.get("message", "An error occurred while processing the response.")
+        else:
+            error_message = "I'm sorry, but I couldn't find a suitable debate topic at the moment. Could you suggest a topic you'd like to discuss?"
+        
+        # Set error message across all relevant fields for consistency
+        state["message_flow"] = error_message
+        state["bot_message"] = error_message
+        state["response"] = error_message
+    
+        return state

@@ -101,7 +101,18 @@ class EffectivenessEvaluator(BaseWorker):
         result_text = response.content.strip()
         
         # Ensure the score is a float between 0 and 100
-        score = float(result_text)
+        try:
+            # Extract numeric value from the response in case it's not just a number
+            numeric_values = re.findall(r'\d+', result_text)
+            if numeric_values:
+                score = float(numeric_values[0])
+            else:
+                # Default to 50 if no numeric value found
+                score = 50.0
+                logger.warning(f"Could not extract numeric score from: {result_text}, using default value 50.0")
+        except Exception as e:
+            logger.error(f"Error parsing effectiveness score: {e}")
+            score = 50.0  # Default value
         
         state["effectiveness_score"] = score
         

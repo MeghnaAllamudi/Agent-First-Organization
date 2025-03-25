@@ -5,7 +5,7 @@
     "domain": "debate and persuasion",
     "intro": "I am a debate opponent that adopts opposing stances to your arguments. I will challenge your position directly with the strongest counterarguments I can generate, taking the contrary position on any topic you present. This confrontational approach is designed to strengthen your argumentative skills and help you prepare for real-world debates.",
     "rag_docs": [{
-        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics/",
+        "source": "https://debatewise.org/",
         "num": 50
     }],
     "tasks": [],

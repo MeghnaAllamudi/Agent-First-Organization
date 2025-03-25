@@ -232,12 +232,49 @@ def build_database(folder_path):
     conn.close()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--folder_path", required=True, type=str, help="location to save the documents")
+def build_debate_history_database(folder_path):
+    """Build the debate history database with necessary tables."""
+    db_path = Path(folder_path) / "debate_history_db.sqlite"
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    
+    # Creating the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Create debate_history table
+    cursor.execute('''
+        CREATE TABLE debate_history (
+            id VARCHAR(40) PRIMARY KEY,
+            user_id VARCHAR(40),
+            user_argument TEXT,
+            bot_argument TEXT,
+            user_strategy TEXT,
+            bot_strategy TEXT,
+            timestamp TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+        )
+    ''')
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Created debate history database at {db_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Build the database with necessary tables')
+    parser.add_argument('--folder', type=str, default='examples/debate_opponent',
+                      help='Folder path where the database will be created')
     args = parser.parse_args()
 
-    if not os.path.exists(args.folder_path):
-        os.makedirs(args.folder_path)
+    # Create the folder if it doesn't exist
+    os.makedirs(args.folder, exist_ok=True)
+    
+    # Build both databases
+    build_database(args.folder)
+    build_debate_history_database(args.folder)
 
-    build_database(args.folder_path)
+
+if __name__ == "__main__":
+    main()

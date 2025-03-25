@@ -267,11 +267,18 @@ class DatabaseActions:
         """
         logger.info("Inserting latest debate argument into database")
         
-        # Extract debate information from the message state
-        user_argument = msg_state.get("user_message").message
-        bot_argument = msg_state.get("orchestrator_message").message
+        # Extract debate information from message state
+        user_argument = msg_state.get("user_message", {}).get("message", "")
+        # Try multiple fields where the bot's message might be stored
+        bot_argument = msg_state.get("new_counter_argument", "")
+        if not bot_argument:
+            bot_argument = msg_state.get("response", "")
+        if not bot_argument:
+            bot_argument = msg_state.get("bot_message", "")
+        
         user_strategy = msg_state.get("user_classification", "")
-        bot_strategy = msg_state.get("bot_classification", "")
+        bot_strategy = msg_state.get("persuasion_strategy_used", msg_state.get("bot_classification", ""))
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Connect to the database
         conn = sqlite3.connect(self.db_path)
@@ -288,7 +295,7 @@ class DatabaseActions:
             bot_argument,
             user_strategy,
             bot_strategy,
-            datetime.now()
+            timestamp
         ))
         
         # Commit changes and close the connection
@@ -355,5 +362,61 @@ class DatabaseActions:
         
         cursor.close()
         conn.close()
+        return msg_state
+    
+
+class DebateDatabaseActions:
+    def __init__(self, user_id: str=USER_ID):
+        # Get the default data directory if DATA_DIR is not set
+        default_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "tools", "database", "debate_db")
+        data_dir = os.environ.get("DATA_DIR", default_data_dir)
+        self.db_path = os.path.join(data_dir, DBNAME)
+        self.user_id = user_id
+
+    def log_in(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM user WHERE id = ?", (self.user_id,))
+        result = cursor.fetchone()
+        if result is None:
+            logger.info(f"User {self.user_id} not found in the database.")
+        else:
+            logger.info(f"User {self.user_id} successfully logged in.")
+        return result is not None
+
+    def insert_latest_debate_argument(self, msg_state: MessageState) -> MessageState:
+        """
+        Inserts the latest debate arguments and strategies into the debate_history table
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Extract debate information from message state
+        user_argument = msg_state.get("user_message", {}).get("message", "")
+        # Try multiple fields where the bot's message might be stored
+        bot_argument = msg_state.get("new_counter_argument", "")
+        if not bot_argument:
+            bot_argument = msg_state.get("response", "")
+        if not bot_argument:
+            bot_argument = msg_state.get("bot_message", "")
+        
+        user_strategy = msg_state.get("user_classification", "")
+        bot_strategy = msg_state.get("persuasion_strategy_used", msg_state.get("bot_classification", ""))
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            cursor.execute("""
+                INSERT INTO debate_history 
+                (user_id, user_argument, bot_argument, user_strategy, bot_strategy, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (self.user_id, user_argument, bot_argument, user_strategy, bot_strategy, timestamp))
+            conn.commit()
+            logger.info("Successfully inserted debate argument into database")
+        except Exception as e:
+            logger.error(f"Error inserting debate argument: {e}")
+        finally:
+            cursor.close()
+            conn.close()
+
         return msg_state
     

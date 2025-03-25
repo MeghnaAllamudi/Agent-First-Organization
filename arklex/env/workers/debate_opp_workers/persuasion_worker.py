@@ -47,12 +47,27 @@ class PersuasionWorker(BaseWorker):
         # Get relevant state information
         user_message = state.get("user_message", {}).message
             
-        bot_message = state.get("response", {})
+        bot_message = state.get("bot_message", state.get("response", ""))
             
+        # Get the topic from state - use either the stored topic or extract it from the bot message
         topic = state.get("topic", "")
+        if not topic and bot_message:
+            # Try to extract a topic from the first paragraph of the bot message
+            paragraphs = bot_message.split('\n\n')
+            if paragraphs:
+                # Get first paragraph and limit to a reasonable length
+                first_para = paragraphs[0].strip()
+                if len(first_para) > 100:
+                    topic = first_para[:100] + "..."
+                else:
+                    topic = first_para
+            
+        # Log the topic for debugging
+        logger.info(f"Debate topic: {topic}")
+            
         user_classification = state.get("user_classification", "logos")
         bot_classification = state.get("bot_classification", "logos")
-        effectiveness_score = state.get("effectiveness_score", 0.5)
+        effectiveness_score = state.get("effectiveness_score", 50.0)
         
         # Log the values for debugging
         logger.info(f"User classification: {user_classification}")
@@ -60,7 +75,7 @@ class PersuasionWorker(BaseWorker):
         logger.info(f"Effectiveness score: {effectiveness_score}")
         
         # Determine which classification to use for next argument
-        classification_to_use = user_classification if effectiveness_score < 0.5 else bot_classification
+        classification_to_use = user_classification if effectiveness_score < 50 else bot_classification
         logger.info(f"Using classification: {classification_to_use}")
         
         persuasion_descriptions = {
@@ -71,27 +86,28 @@ class PersuasionWorker(BaseWorker):
         
         # Create the persuasive argument generation prompt
         prompt = f"""
-        You are an expert debater skilled in various persuasion techniques. Generate a compelling counter-argument to the user's latest message.
+        You are an expert debater skilled in various persuasion techniques. Generate a persuasive counter-argument to continue our debate.
 
         DEBATE TOPIC: {topic}
 
         USER'S LATEST ARGUMENT: 
         {user_message}
 
-        BOT'S PREVIOUS ARGUMENT:
+        YOUR PREVIOUS ARGUMENT:
         {bot_message}
 
         PERSUASION STRATEGY: Your counter-argument should primarily use {classification_to_use}-based persuasion, which focuses on {persuasion_descriptions.get(classification_to_use, "balanced reasoning")}.
 
-        EFFECTIVENESS ANALYSIS: The effectiveness score of your previous argument was {effectiveness_score*100:.0f}%. 
-        {"Since this was less than 50, you need to adapt by matching the user's persuasion style." if effectiveness_score < 0.5 else "Since this was effective, you should continue with your current persuasion approach."}
+        EFFECTIVENESS ANALYSIS: The effectiveness score of your previous argument was {effectiveness_score:.0f}%. 
+        {"Since this was less than 50, you need to adapt by matching the user's persuasion style." if effectiveness_score < 50 else "Since this was effective, you should continue with your current persuasion approach."}
 
-        Guidelines:
-        1. Address specific points from the user's argument
-        2. Use strong {classification_to_use}-based appeals appropriate to the topic
-        3. Be persuasive but respectful
-        4. Keep your response focused and concise (about 3-4 paragraphs maximum)
-        5. End with a question or statement that encourages further discussion
+        IMPORTANT GUIDELINES:
+        1. Maintain your opposition to the topic - your job is to challenge the user
+        2. Use specific {classification_to_use}-based appeals in your arguments
+        3. Be direct, specific, and use concrete examples to support your position
+        4. Address specific points from the user's argument
+        5. Keep your response conversational (about 3-4 paragraphs)
+        6. End with a question or statement that encourages further discussion
 
         Generate a persuasive counter-argument now:
         """
@@ -102,6 +118,8 @@ class PersuasionWorker(BaseWorker):
         
         # Update state with new counter-argument
         state["new_counter_argument"] = counter_argument
+        state["response"] = counter_argument
+        state["bot_message"] = counter_argument
         state["persuasion_strategy_used"] = classification_to_use
         
         print("PERSUASION_WORKER")

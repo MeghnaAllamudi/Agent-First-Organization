@@ -6,10 +6,9 @@ from langchain_openai import ChatOpenAI
 
 from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.env.tools.utils import ToolGenerator
-from arklex.env.tools.database.utils import DatabaseActions
+from arklex.env.tools.database.utils import DebateDatabaseActions
 from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
-from arklex.env.workers.debate_opp_workers.build_debate_database import build_debate_history_table
 
 
 logger = logging.getLogger(__name__)
@@ -25,13 +24,7 @@ class DebateHistoryDatabaseWorker(BaseWorker):
         self.actions = {
             "InsertConversationUpdate": "Insert last argument", 
         }
-        self.DBActions = DatabaseActions()
-        # Ensure the debate_history table exists
-        data_dir = os.environ.get("DATA_DIR")
-        if data_dir:
-            build_debate_history_table(data_dir)
-        else:
-            logger.warning("DATA_DIR environment variable not set. Debate history table might not be created.")
+        self.DBActions = DebateDatabaseActions()
         
         self.action_graph = self._create_action_graph()
 
@@ -46,7 +39,6 @@ class DebateHistoryDatabaseWorker(BaseWorker):
 
     def execute(self, msg_state: MessageState):
         self.DBActions.log_in()
-        msg_state["slots"] = self.DBActions.init_slots(msg_state["slots"], msg_state["bot_config"])
         graph = self.action_graph.compile()
         result = graph.invoke(msg_state)
         return result

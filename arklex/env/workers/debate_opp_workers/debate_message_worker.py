@@ -65,11 +65,21 @@ class DebateMessageWorker(MessageWorker):
         workflow.add_edge("rag","classifier")
         workflow.add_edge("classifier","effectiveness")
         workflow.add_edge("effectiveness","persuasion")
-        workflow.add_edge("persuasion","database-update")
+        workflow.add_edge("persuasion","debate-update")
         
         return workflow 
     
     def execute(self, msg_state: MessageState):
         graph = self.action_graph.compile()
         result = graph.invoke(msg_state)
+        
+        # Ensure the message_flow is set to the latest counter-argument for proper output
+        if result.get("new_counter_argument"):
+            result["message_flow"] = result["new_counter_argument"]
+        elif result.get("response"):
+            result["message_flow"] = result["response"]
+        elif result.get("bot_message"):
+            result["message_flow"] = result["bot_message"]
+            
+        logger.info(f"DebateMessageWorker returning response: {result.get('message_flow', '')[:100]}...")
         return result
