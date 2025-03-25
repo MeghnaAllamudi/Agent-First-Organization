@@ -17,12 +17,33 @@ from arklex.env.tools.RAG.build_rag import build_rag
 from arklex.env.tools.database.build_database import build_database
 from arklex.utils.model_config import MODEL
 
+from arklex.utils.rate_limiter import RateLimiter
+
+from arklex.env.workers.worker import BaseWorker, register_worker
+from arklex.env.workers.debate_opp_workers.debate_rag_worker import DebateRAGWorker
+
+from arklex.env.workers.message_worker import MessageWorker
+from arklex.env.workers.default_worker import DefaultWorker
+from arklex.env.workers.debate_opp_workers.persuasion_worker import PersuasionWorker
+from arklex.env.workers.debate_opp_workers.debate_message_worker import DebateMessageWorker
+from arklex.env.workers.debate_opp_workers.argument_classifier_worker import ArgumentClassifier
+from arklex.env.workers.debate_opp_workers.effectiveness_evaluator_worker import EffectivenessEvaluator
+
+
+
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
+
+# Initialize rate limiter
+rate_limiter = RateLimiter()
 
 # API_PORT = "55135"
 # NLUAPI_ADDR = f"http://localhost:{API_PORT}/nlu"
 # SLOTFILLAPI_ADDR = f"http://localhost:{API_PORT}/slotfill"
+
+def create_output_dir(output_dir: str):
+    """Create output directory if it doesn't exist."""
+    os.makedirs(output_dir, exist_ok=True)
 
 def generate_taskgraph(args):
     model = ChatOpenAI(model=MODEL["model_type_or_path"], timeout=30000)
@@ -39,8 +60,26 @@ def generate_taskgraph(args):
 def init_worker(args):
     ## TODO: Need to customized based on different use cases
     config = json.load(open(args.config))
+    is_debate_config = "debate" in os.path.basename(args.config).lower()
     workers = config["workers"]
     worker_names = set([worker["name"] for worker in workers])
+    
+    if is_debate_config: 
+        for worker_name in worker_names: 
+            if worker_name == "PersuasionWorker":
+                worker = PersuasionWorker()
+            elif worker_name == "DebateRAGWorker":
+                worker = DebateRAGWorker()
+            elif worker_name == "DebateMessageWorker" or worker_name == "MessageWorker":
+                worker = DebateMessageWorker()
+            elif worker_name == "DefaultWorker":
+                worker = DefaultWorker()
+            elif worker_name == "ArgumentClassifier":
+                worker = ArgumentClassifier()
+            elif worker_name == "EffectivenessEvaluator":
+                worker = EffectivenessEvaluator()
+
+    
     if "FaissRAGWorker" in worker_names:
         logger.info("Initializing FaissRAGWorker...")
         # if url: uncomment the following line

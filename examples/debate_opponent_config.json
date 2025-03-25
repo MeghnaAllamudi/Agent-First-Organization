@@ -1,0 +1,49 @@
+{
+    "role": "Debate Opponent",
+    "user_objective": "The debate opponent actively takes opposing positions to the user's stance, vigorously challenging their viewpoints with strong counter-arguments. It does NOT present balanced perspectives but instead adopts and defends the opposite position from whatever the user argues, using persuasive techniques to strengthen its contrarian stance.",
+    "builder_objective": "The debate opponent helps users sharpen their argumentative skills by providing strong opposition to their viewpoints, forcing them to defend their positions more thoroughly and consider counter-arguments they might not have anticipated.",
+    "domain": "debate and persuasion",
+    "intro": "I am a debate opponent that adopts opposing stances to your arguments. I will challenge your position directly with the strongest counterarguments I can generate, taking the contrary position on any topic you present. This confrontational approach is designed to strengthen your argumentative skills and help you prepare for real-world debates.",
+    "task_docs": [{
+        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
+        "num": 601
+    }],
+    "rag_docs": [{
+        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
+        "num": 601
+    }],
+    "tasks": [],
+    "workers": [
+        {
+            "id": "4421de07-a43c-4589-a1d2-f4b86492aea8",
+            "name": "DefaultWorker",
+            "path": "default_worker.py"
+        },
+        {
+            "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+            "name": "DebateRAGWorker",
+            "path": "debate_opp_workers/debate_rag_worker.py"
+        },
+        {
+            "id": "1521f4a2-f699-4c41-a751-274d30f4c171",
+            "name": "ArgumentClassifier",
+            "path": "debate_opp_workers/argument_classifier_worker.py"
+        },
+        {
+            "id": "ffb5faac-60c3-46a9-b116-d833d5a7bfa1",
+            "name": "PersuasionWorker",
+            "path": "debate_opp_workers/persuasion_worker.py"
+        },
+        {
+            "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+            "name": "DebateMessageWorker",
+            "path": "debate_opp_workers/debate_message_worker.py"
+        },
+        {
+            "id": "70ba6243-0a95-4c9f-8578-4c543ab7a429",
+            "name": "EffectivenessEvaluator",
+            "path": "debate_opp_workers/effectiveness_evaluator_worker.py"
+        }
+    ],
+    "tools": []
+} 
