@@ -246,6 +246,6 @@ Start Message:
 }}
 ```
 
-Builder's prompt: The builder want to create a chatbot - {role}. {u_objective}
+Builder's prompt: The builder want to create a chatbot - {role}. {user_objective}
 Start Message:
 """

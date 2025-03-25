@@ -14,7 +14,6 @@ from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
 from langgraph.graph import StateGraph, START
 from arklex.utils.model_provider_config import PROVIDER_MAP
-from arklex.env.workers.hooks import with_standard_hooks, timing_start_hook, timing_end_hook, required_fields_hook, with_hooks
 # Remove the general prompts import if it exists
 # from arklex.env.prompts import load_prompts
 
@@ -43,9 +42,8 @@ class EffectivenessEvaluator(BaseWorker):
 
     def __init__(self):
         super().__init__()
-        self.llm = PROVIDER_MAP[MODEL["provider"]](
-            model_name=MODEL["model"],
-            temperature=0.3
+        self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
+            model=MODEL["model_type_or_path"], timeout=30000
         )
         self.action_graph = self._create_action_graph(); 
 

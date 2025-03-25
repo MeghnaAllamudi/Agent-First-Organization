@@ -14,12 +14,6 @@ from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
 from arklex.utils.model_provider_config import PROVIDER_MAP
-from arklex.env.tools.debate_db import (
-    read_debate_history,
-    store_debate_record,
-    update_debate_record,
-    get_persuasion_stats
-)
 
 logger = logging.getLogger(__name__)
 

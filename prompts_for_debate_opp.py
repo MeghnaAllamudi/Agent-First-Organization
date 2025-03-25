@@ -4,7 +4,7 @@ This module contains the prompts used to generate a debate opponent chatbot.
 """
 
 debate_generate_tasks_sys_prompt = """You are generating tasks for a debate opponent chatbot. 
-
+  
 Your task is to generate detailed tasks that a debate opponent chatbot would need to perform. The tasks should represent a sophisticated debate flow that explicitly tracks persuasion techniques (logos, pathos, ethos) and their effectiveness, with a complete read-evaluate-update cycle for continual improvement.
 
 CRITICAL REQUIREMENTS FOR TASK GENERATION:

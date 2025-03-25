@@ -24,8 +24,7 @@ from arklex.env.workers.message_worker import MessageWorker
 from arklex.env.workers.default_worker import DefaultWorker
 from arklex.env.workers.persuasion_worker import PersuasionWorker
 from arklex.env.workers.argument_classifier import ArgumentClassifier
-from arklex.env.workers.debate_database_worker import DebateDatabaseWorker
-from examples.debate_opponent_tests.test_debate_workers import EffectivenessEvaluator
+from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
 
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()

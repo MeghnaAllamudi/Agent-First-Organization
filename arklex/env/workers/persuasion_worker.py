@@ -26,9 +26,8 @@ class PersuasionWorker(BaseWorker):
     
     def __init__(self):
         super().__init__()
-        self.llm = PROVIDER_MAP[MODEL["provider"]](
-            model_name=MODEL["model"],
-            temperature=0.3
+        self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
+            model=MODEL["model_type_or_path"], timeout=30000
         )
         self.action_graph = self._create_action_graph()
         

@@ -8,13 +8,12 @@ from datetime import datetime
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, START
 
 from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.utils.graph_state import MessageState, ConvoMessage
 from arklex.utils.model_config import MODEL
 from arklex.utils.model_provider_config import PROVIDER_MAP
-from langgraph.graph import StateGraph, START
-from arklex.env.workers.hooks import with_standard_hooks, required_fields_hook, with_hooks, persuasion_type_hook
 
 # Import argument_classifier_prompt from prompts_for_debate_opp
 import importlib.util
@@ -46,9 +45,8 @@ class ArgumentClassifier(BaseWorker):
 
     def __init__(self):
         super().__init__()
-        self.llm = PROVIDER_MAP[MODEL["provider"]](
-            model_name=MODEL["model"],
-            temperature=0.3
+        self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
+            model=MODEL["model_type_or_path"], timeout=30000
         )
         self.action_graph = self._create_action_graph()
 
