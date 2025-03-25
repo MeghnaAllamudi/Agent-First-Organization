@@ -4,13 +4,9 @@
     "builder_objective": "The debate opponent helps users sharpen their argumentative skills by providing strong opposition to their viewpoints, forcing them to defend their positions more thoroughly and consider counter-arguments they might not have anticipated.",
     "domain": "debate and persuasion",
     "intro": "I am a debate opponent that adopts opposing stances to your arguments. I will challenge your position directly with the strongest counterarguments I can generate, taking the contrary position on any topic you present. This confrontational approach is designed to strengthen your argumentative skills and help you prepare for real-world debates.",
-    "task_docs": [{
-        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
-        "num": 601
-    }],
     "rag_docs": [{
-        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics",
-        "num": 601
+        "source": "https://www.kialo-edu.com/debate-topics-and-argumentative-essay-topics/",
+        "num": 50
     }],
     "tasks": [],
     "workers": [

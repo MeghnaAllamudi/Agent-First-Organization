@@ -66,22 +66,9 @@ def init_worker(args):
     
     if is_debate_config: 
         for worker_name in worker_names: 
-            if worker_name == "PersuasionWorker":
-                worker = PersuasionWorker()
-            elif worker_name == "DebateRAGWorker":
-                worker = DebateRAGWorker()
-            elif worker_name == "MessageWorker": 
-                worker = MessageWorker()
-            elif worker_name == "DebateMessageWorker":
-                worker = DebateMessageWorker()
-            elif worker_name == "DefaultWorker":
-                worker = DefaultWorker()
-            elif worker_name == "ArgumentClassifier":
-                worker = ArgumentClassifier()
-            elif worker_name == "EffectivenessEvaluator":
-                worker = EffectivenessEvaluator()
-
-    
+            if worker_name == "DebateRAGWorker":
+                build_rag(args.output_dir, config["rag_docs"])
+ 
     if "FaissRAGWorker" in worker_names:
         logger.info("Initializing FaissRAGWorker...")
         # if url: uncomment the following line
