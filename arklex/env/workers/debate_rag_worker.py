@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 import logging
+import random
 
 from langgraph.graph import StateGraph, START
 from langchain.prompts import PromptTemplate
@@ -10,7 +11,7 @@ from arklex.env.workers.worker import BaseWorker, register_worker
 from arklex.utils.graph_state import MessageState
 from arklex.utils.model_config import MODEL
 from arklex.utils.model_provider_config import PROVIDER_MAP
-from arklex.utils.loader import DebateLoader
+from arklex.utils.debate_loader import DebateLoader
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 class DebateRAGWorker(BaseWorker):
     """A worker that uses RAG to enhance debate responses with relevant information."""
     
-    description = "Uses RAG to enhance debate responses with relevant information from a knowledge base."
+    description = "Uses RAG to pick a debate topic and enhance debate responses with relevant information from a knowledge base. This is the first worker to run and it must use the ArgumentClassifier after."
     
     def __init__(self, tools: Optional[Dict[str, Any]] = None):
         super().__init__()
@@ -47,15 +48,10 @@ class DebateRAGWorker(BaseWorker):
         )
         
         logger.info("DebateRAGWorker initialized successfully")
-
-    def _create_action_graph(self) -> StateGraph:
-        """Creates the action graph for debate handling."""
-        workflow = StateGraph(MessageState)
-        workflow.add_node("debate_handler", self.execute)
-        workflow.add_edge(START, "debate_handler")
-        return workflow
-
-    def execute(self, msg_state: MessageState) -> MessageState:
+        
+        self.action_graph = self._create_action_graph()
+        
+    def _pick_debate_topic(self, msg_state: MessageState) -> MessageState:
         """Executes the debate workflow."""
         logger.info("Starting debate processing")
         try:
@@ -123,6 +119,24 @@ class DebateRAGWorker(BaseWorker):
     def _handle_error(self, state: MessageState) -> MessageState:
         """Handles errors in debate processing."""
         logger.error("Handling error state")
-        error_response = self.tools["error_tool"].create_error_response("rag")
-        state["message_flow"] = error_response.get("message", "An error occurred while processing the response.")
+        if hasattr(self, 'tools') and self.tools and "error_tool" in self.tools:
+            error_response = self.tools["error_tool"].create_error_response("rag")
+            state["message_flow"] = error_response.get("message", "An error occurred while processing the response.")
+        else:
+            state["message_flow"] = "I'm sorry, but I couldn't find a suitable debate topic at the moment. Could you suggest a topic you'd like to discuss?"
         return state 
+
+    def _create_action_graph(self) -> StateGraph:
+        """Creates the action graph for debate handling."""
+        workflow = StateGraph(MessageState)
+        workflow.add_node("debate_handler", self._pick_debate_topic)
+        workflow.add_edge(START, "debate_handler")
+        return workflow
+    
+    def execute(self, state: MessageState) -> MessageState:
+        graph = self.action_graph.compile()
+        result = graph.invoke(state)
+        return result
+    
+# Register the effectiveness evaluator worker
+register_worker(DebateRAGWorker) 

@@ -1,6 +1,5 @@
 import logging
 from typing import Any
-import importlib
 import traceback
 
 from arklex.env.workers.worker import register_worker
@@ -11,6 +10,14 @@ from langchain.prompts import PromptTemplate
 from arklex.utils.utils import chunk_string
 from langchain_core.output_parsers import StrOutputParser
 from arklex.utils.model_config import MODEL
+from langgraph.graph import StateGraph, START, END
+from arklex.env.workers.hooks import with_standard_hooks
+
+# Import the necessary worker classes
+from arklex.env.workers.debate_rag_worker import DebateRAGWorker
+from arklex.env.workers.argument_classifier import ArgumentClassifier
+from arklex.env.workers.effectiveness_evaluator import EffectivenessEvaluator
+from arklex.env.workers.persuasion_worker import PersuasionWorker
 
 logger = logging.getLogger(__name__)
 
@@ -33,185 +40,6 @@ class DebateMessageWorker(MessageWorker):
         }
         
         return type_descriptions.get(persuasion_type, "")
-
-    def _run_database_checks(self, state: MessageState) -> MessageState:
-        """Run database checks and updates after every user response.
-        
-        This method is called in the execute method to ensure database operations
-        happen consistently, regardless of task graph structure.
-        
-        Args:
-            state: Current message state
-            
-        Returns:
-            Updated state after database operations
-        """
-        print("\n================================================================================")
-        print(f"💾 RUNNING DATABASE CHECKS (from DebateMessageWorker)")
-        print(f"================================================================================\n")
-        
-        # Add a marker that this state was processed by DebateMessageWorker
-        # Do this BEFORE any other operations to ensure consistent state identification
-        state["source_worker"] = "DebateMessageWorker"
-        
-        try:
-            # CRITICAL: Ensure all required state variables exist
-            print(f"🔑 AVAILABLE STATE KEYS BEFORE CLEANUP: {list(state.keys())}")
-            
-            # Ensure basic required keys exist
-            required_defaults = {
-                'user_message': None,
-                'message_flow': "",
-                'bot_config': {},
-                'sys_instruct': ""
-            }
-            
-            # Fill in any missing required keys
-            for key, default_value in required_defaults.items():
-                if key not in state:
-                    print(f"⚠️ Adding missing required key: {key}")
-                    state[key] = default_value
-            
-            # Ensure metadata and global_state are initialized
-            if "metadata" not in state:
-                print(f"⚠️ Adding missing metadata dict")
-                state["metadata"] = {}
-                
-            if "global_state" not in state["metadata"]:
-                print(f"⚠️ Adding missing global_state dict")
-                state["metadata"]["global_state"] = {}
-            
-            # Log global state
-            print(f"🔑 GLOBAL STATE KEYS: {list(state['metadata']['global_state'].keys())}")
-            
-            # Check if we have enough context to run database operations
-            if "trajectory" not in state or not state.get("trajectory"):
-                print("⏸️ SKIPPING DATABASE CHECKS - No trajectory found")
-                return state
-                
-            # Ensure user has responded at least once
-            trajectory = state.get("trajectory", [])
-            message_count = len(trajectory)
-            if message_count < 3:  # Need at least welcome, user1, bot1
-                print(f"⏸️ SKIPPING DATABASE CHECKS - Not enough message history (current count: {message_count})")
-                return state
-                
-            # Lazy-load the DebateDatabaseWorker to avoid circular imports
-            try:
-                # Try to import the DatabaseWorker dynamically
-                module = importlib.import_module('arklex.env.workers.debate_database_worker')
-                db_worker_class = getattr(module, 'DebateDatabaseWorker')
-                
-                # Create a temporary instance just for this operation
-                db_worker = db_worker_class()
-                
-                # Create a deep clone of the state for database operations
-                db_state = MessageState()
-                for key, value in state.items():
-                    db_state[key] = value
-                
-                # Set the operation to "update" to indicate we want to update effectiveness scores
-                db_state["operation"] = "update"
-                
-                # CRITICAL: Ensure persuasion types are properly set in both direct state and global state
-                # Check for user_persuasion_type
-                user_persuasion_type = None
-                
-                # First check global state (higher priority)
-                if "metadata" in state and "global_state" in state["metadata"] and "user_persuasion_type" in state["metadata"]["global_state"]:
-                    user_persuasion_type = state["metadata"]["global_state"]["user_persuasion_type"]
-                    print(f"✅ Found user_persuasion_type in global state: {user_persuasion_type}")
-                # Then check direct state
-                elif "user_persuasion_type" in state:
-                    user_persuasion_type = state["user_persuasion_type"]
-                    print(f"✅ Found user_persuasion_type in direct state: {user_persuasion_type}")
-                
-                # If we found a user_persuasion_type, ensure it's in both places
-                if user_persuasion_type:
-                    db_state["user_persuasion_type"] = user_persuasion_type
-                    db_state["metadata"]["global_state"]["user_persuasion_type"] = user_persuasion_type
-                    print(f"✅ Ensured user_persuasion_type is in both direct state and global state: {user_persuasion_type}")
-                else:
-                    # Default to logos if no persuasion type found
-                    user_persuasion_type = "logos"
-                    db_state["user_persuasion_type"] = user_persuasion_type
-                    db_state["metadata"]["global_state"]["user_persuasion_type"] = user_persuasion_type
-                    print(f"⚠️ No user_persuasion_type found. Defaulting to: {user_persuasion_type}")
-                
-                # Check for counter_persuasion_type
-                counter_persuasion_type = None
-                
-                # First check global state (higher priority)
-                if "metadata" in state and "global_state" in state["metadata"] and "counter_persuasion_type" in state["metadata"]["global_state"]:
-                    counter_persuasion_type = state["metadata"]["global_state"]["counter_persuasion_type"]
-                    print(f"✅ Found counter_persuasion_type in global state: {counter_persuasion_type}")
-                # Then check direct state
-                elif "counter_persuasion_type" in state:
-                    counter_persuasion_type = state["counter_persuasion_type"]
-                    print(f"✅ Found counter_persuasion_type in direct state: {counter_persuasion_type}")
-                
-                # If we found a counter_persuasion_type, ensure it's in both places
-                if counter_persuasion_type:
-                    db_state["counter_persuasion_type"] = counter_persuasion_type
-                    db_state["metadata"]["global_state"]["counter_persuasion_type"] = counter_persuasion_type
-                    print(f"✅ Ensured counter_persuasion_type is in both direct state and global state: {counter_persuasion_type}")
-                else:
-                    # Default to same as user_persuasion_type if no counter type found
-                    counter_persuasion_type = user_persuasion_type
-                    db_state["counter_persuasion_type"] = counter_persuasion_type
-                    db_state["metadata"]["global_state"]["counter_persuasion_type"] = counter_persuasion_type
-                    print(f"⚠️ No counter_persuasion_type found. Defaulting to: {counter_persuasion_type}")
-                
-                # Also set current_persuasion_type for consistency
-                db_state["current_persuasion_type"] = counter_persuasion_type
-                db_state["metadata"]["global_state"]["current_persuasion_type"] = counter_persuasion_type
-                
-                # Check if we have an effectiveness score to update
-                if "evaluated_effectiveness_score" in state:
-                    db_state["evaluated_effectiveness_score"] = state["evaluated_effectiveness_score"]
-                    print(f"✅ Found evaluated_effectiveness_score in state: {state['evaluated_effectiveness_score']}")
-                    # Also copy to global state
-                    db_state["metadata"]["global_state"]["evaluated_effectiveness_score"] = state["evaluated_effectiveness_score"]
-                # Also check global state
-                elif "metadata" in state and "global_state" in state["metadata"] and "evaluated_effectiveness_score" in state["metadata"]["global_state"]:
-                    db_state["evaluated_effectiveness_score"] = state["metadata"]["global_state"]["evaluated_effectiveness_score"]
-                    print(f"✅ Found evaluated_effectiveness_score in global state: {state['metadata']['global_state']['evaluated_effectiveness_score']}")
-                else:
-                    print("⚠️ No evaluated_effectiveness_score found. Database update will be skipped.")
-                
-                # Execute the database worker with our prepared state
-                print("🔄 EXECUTING DATABASE WORKER")
-                updated_state = db_worker.execute(db_state)
-                
-                # CRITICAL: Copy important values back from updated state
-                # First, update our global state with any new values from the database worker
-                for key, value in updated_state["metadata"]["global_state"].items():
-                    state["metadata"]["global_state"][key] = value
-                    print(f"✅ Copied {key} from database worker to global state")
-                
-                # Now check if there are any direct state values to copy back
-                important_keys = ["user_persuasion_type", "counter_persuasion_type", "current_persuasion_type", 
-                                  "evaluated_effectiveness_score", "best_persuasion_type"]
-                
-                for key in important_keys:
-                    if key in updated_state:
-                        state[key] = updated_state[key]
-                        print(f"✅ Copied {key} from database worker to direct state: {updated_state[key]}")
-                
-                print("💾 DATABASE CHECKS COMPLETED SUCCESSFULLY")
-                
-            except ImportError:
-                print("⚠️ ERROR: Could not import DebateDatabaseWorker module")
-                print(f"⚠️ Traceback: {traceback.format_exc()}")
-            except Exception as e:
-                print(f"⚠️ ERROR: Exception during database worker execution: {e}")
-                print(f"⚠️ Traceback: {traceback.format_exc()}")
-        except Exception as e:
-            print(f"⚠️ ERROR: Exception during database checks: {e}")
-            print(f"⚠️ Traceback: {traceback.format_exc()}")
-            
-        # Even if there was an error, return the original state to ensure execution continues
-        return state
 
     def generator(self, state: MessageState) -> MessageState:
         """Generate responses using the best persuasion strategy."""
@@ -549,161 +377,172 @@ Response:"""
                 print(f"⚠️ WARNING: Required key '{key}' is missing from state!")
                 # Don't try to fix here - just log it
         
-        # Instead of doing our own classification, respect classification from ArgumentClassifier
-        user_persuasion_type = None
+        # Compile and invoke the action graph with our worker chain
+        print("🔄 COMPILING AND INVOKING ACTION GRAPH WITH WORKER CHAIN")
+        print("🔄 Chain: debate message worker -> debate rag worker -> argument classifier -> effectiveness score -> persuasion type -> debate message worker")
         
-        # Check for user_persuasion_type in all possible locations
-        if "user_persuasion_type" in state:
-            user_persuasion_type = state["user_persuasion_type"]
-            print(f"📊 FOUND user_persuasion_type IN STATE: {user_persuasion_type.upper()}")
-        elif "metadata" in state and "global_state" in state["metadata"] and "user_persuasion_type" in state["metadata"]["global_state"]:
-            user_persuasion_type = state["metadata"]["global_state"]["user_persuasion_type"]
-            print(f"📊 FOUND user_persuasion_type IN GLOBAL STATE: {user_persuasion_type.upper()}")
-        elif "argument_classification" in state:
-            # Extract from argument_classification
-            arg_class = state["argument_classification"]
-            if isinstance(arg_class, dict) and "dominant_type" in arg_class:
-                dom_type = arg_class["dominant_type"].lower()
-                if dom_type == "emotional" or dom_type == "emotion":
-                    user_persuasion_type = "pathos"
-                elif dom_type == "logical" or dom_type == "rational":
-                    user_persuasion_type = "logos"
-                elif dom_type == "ethical" or dom_type == "moral" or dom_type == "values":
-                    user_persuasion_type = "ethos"
-                else:
-                    user_persuasion_type = "logos"  # default
-                print(f"📊 EXTRACTED user_persuasion_type FROM argument_classification: {user_persuasion_type.upper()}")
-        
-        # If we found a user_persuasion_type, use it to determine response type
-        if user_persuasion_type:
-            # Store it in state for consistent access
-            state["user_persuasion_type"] = user_persuasion_type
-            if "metadata" not in state:
-                state["metadata"] = {}
-            if "global_state" not in state["metadata"]:
-                state["metadata"]["global_state"] = {}
-            state["metadata"]["global_state"]["user_persuasion_type"] = user_persuasion_type
+        try:
+            # Get and compile the action graph
+            graph = self._create_action_graph().compile()
             
-            # If it's pathos, force a pathos response
-            if user_persuasion_type == "pathos":
-                print(f"🔥 USER USED PATHOS ARGUMENTS - GENERATING EMOTIONAL RESPONSE")
-                state["counter_persuasion_type"] = "pathos"
-                state["metadata"]["global_state"]["counter_persuasion_type"] = "pathos"
+            # Invoke the graph with the state
+            result_state = graph.invoke(state)
+            
+            print("✅ ACTION GRAPH EXECUTION COMPLETED")
+            return result_state
+            
+        except Exception as e:
+            print(f"⚠️ ERROR: Exception during action graph execution: {e}")
+            print(f"⚠️ Traceback: {traceback.format_exc()}")
+            
+            # Fall back to original execution method if action graph fails
+            print("⚠️ FALLING BACK TO ORIGINAL EXECUTION METHOD")
+            
+            # Instead of doing our own classification, respect classification from ArgumentClassifier
+            user_persuasion_type = None
+            
+            # Check for user_persuasion_type in all possible locations
+            if "user_persuasion_type" in state:
+                user_persuasion_type = state["user_persuasion_type"]
+                print(f"📊 FOUND user_persuasion_type IN STATE: {user_persuasion_type.upper()}")
+            elif "metadata" in state and "global_state" in state["metadata"] and "user_persuasion_type" in state["metadata"]["global_state"]:
+                user_persuasion_type = state["metadata"]["global_state"]["user_persuasion_type"]
+                print(f"📊 FOUND user_persuasion_type IN GLOBAL STATE: {user_persuasion_type.upper()}")
+            elif "argument_classification" in state:
+                # Extract from argument_classification
+                arg_class = state["argument_classification"]
+                if isinstance(arg_class, dict) and "dominant_type" in arg_class:
+                    dom_type = arg_class["dominant_type"].lower()
+                    if dom_type == "emotional" or dom_type == "emotion":
+                        user_persuasion_type = "pathos"
+                    elif dom_type == "logical" or dom_type == "rational":
+                        user_persuasion_type = "logos"
+                    elif dom_type == "ethical" or dom_type == "moral" or dom_type == "values":
+                        user_persuasion_type = "ethos"
+                    else:
+                        user_persuasion_type = "logos"  # default
+                    print(f"📊 EXTRACTED user_persuasion_type FROM argument_classification: {user_persuasion_type.upper()}")
+            
+            # If we found a user_persuasion_type, use it to determine response type
+            if user_persuasion_type:
+                # Store it in state for consistent access
+                state["user_persuasion_type"] = user_persuasion_type
+                if "metadata" not in state:
+                    state["metadata"] = {}
+                if "global_state" not in state["metadata"]:
+                    state["metadata"]["global_state"] = {}
+                state["metadata"]["global_state"]["user_persuasion_type"] = user_persuasion_type
                 
-                # Look for an existing pathos response
-                if "pathos_persuasion_response" in state:
-                    pathos_response = state["pathos_persuasion_response"]
-                    if isinstance(pathos_response, dict) and "counter_argument" in pathos_response:
-                        counter_argument = pathos_response["counter_argument"]
-                        print(f"⚡⚡⚡ USING PATHOS RESPONSE FROM persuasion_worker")
+                # If it's pathos, force a pathos response
+                if user_persuasion_type == "pathos":
+                    print(f"🔥 USER USED PATHOS ARGUMENTS - GENERATING EMOTIONAL RESPONSE")
+                    state["counter_persuasion_type"] = "pathos"
+                    state["metadata"]["global_state"]["counter_persuasion_type"] = "pathos"
+                    
+                    # Look for an existing pathos response
+                    if "pathos_persuasion_response" in state:
+                        pathos_response = state["pathos_persuasion_response"]
+                        if isinstance(pathos_response, dict) and "counter_argument" in pathos_response:
+                            counter_argument = pathos_response["counter_argument"]
+                            print(f"⚡⚡⚡ USING PATHOS RESPONSE FROM persuasion_worker")
+                            state["response"] = counter_argument
+                            
+                            # Store for future evaluation
+                            user_history = ""
+                            if "user_message" in state and hasattr(state["user_message"], "history"):
+                                user_history = state["user_message"].history
+                            state["bot_message"] = ConvoMessage(history=user_history, message=counter_argument)
+                            print(f"✅ STORED PATHOS RESPONSE AS bot_message")
+                            
+                            return state
+                    
+                    # Generate fallback pathos response if needed
+                    print(f"⚠️ NO PATHOS RESPONSE FOUND - GENERATING FALLBACK")
+                    user_content = ""
+                    if "user_message" in state:
+                        user_message = state["user_message"]
+                        user_content = user_message.content if hasattr(user_message, "content") else str(user_message)
+                    
+                    pathos_response = self._generate_fallback_pathos_response(user_content)
+                    state["response"] = pathos_response
+                    
+                    # Store for future evaluation
+                    user_history = ""
+                    if "user_message" in state and hasattr(state["user_message"], "history"):
+                        user_history = state["user_message"].history
+                    state["bot_message"] = ConvoMessage(history=user_history, message=pathos_response)
+                    print(f"✅ STORED FALLBACK PATHOS RESPONSE AS bot_message")
+                    
+                    return state
+                
+                # If it's logos, ensure we use a logical response
+                elif user_persuasion_type == "logos":
+                    print(f"🧠 USER USED LOGOS ARGUMENTS - GENERATING LOGICAL RESPONSE")
+                    state["counter_persuasion_type"] = "logos"
+                    state["metadata"]["global_state"]["counter_persuasion_type"] = "logos"
+                
+                # If it's ethos, ensure we use an ethical response
+                elif user_persuasion_type == "ethos":
+                    print(f"🏛️ USER USED ETHOS ARGUMENTS - GENERATING ETHICAL RESPONSE")
+                    state["counter_persuasion_type"] = "ethos"
+                    state["metadata"]["global_state"]["counter_persuasion_type"] = "ethos"
+            else:
+                # Default to logos if no classification found
+                print(f"⚠️ NO ARGUMENT CLASSIFICATION FOUND - DEFAULTING TO LOGOS")
+                state["user_persuasion_type"] = "logos"
+                state["counter_persuasion_type"] = "logos"
+                state["metadata"]["global_state"]["user_persuasion_type"] = "logos"
+                state["metadata"]["global_state"]["counter_persuasion_type"] = "logos"
+            
+            # STEP: Generate response based on current state
+            # First check for direct counter_argument from PersuasionWorker
+            if "counter_argument" in state:
+                print(f"📝 USING counter_argument DIRECTLY FROM PERSUASION WORKER")
+                counter_argument = state["counter_argument"]
+                state["response"] = counter_argument
+                
+                # Store the counter_argument as bot_message for future evaluation
+                user_history = ""
+                if "user_message" in state and hasattr(state["user_message"], "history"):
+                    user_history = state["user_message"].history
+                state["bot_message"] = ConvoMessage(history=user_history, message=counter_argument)
+                print(f"✅ STORED counter_argument AS bot_message FOR FUTURE EVALUATION")
+                
+                return state
+            
+            # Then check for persuasion type-specific responses
+            for persuasion_type in ["pathos", "logos", "ethos"]:
+                response_key = f"{persuasion_type}_persuasion_response"
+                if response_key in state:
+                    response_obj = state[response_key]
+                    if isinstance(response_obj, dict) and "counter_argument" in response_obj:
+                        print(f"📝 USING {persuasion_type.upper()} PERSUASION RESPONSE")
+                        counter_argument = response_obj["counter_argument"]
                         state["response"] = counter_argument
                         
-                        # Store for future evaluation
+                        # Store the counter_argument as bot_message for future evaluation
                         user_history = ""
                         if "user_message" in state and hasattr(state["user_message"], "history"):
                             user_history = state["user_message"].history
                         state["bot_message"] = ConvoMessage(history=user_history, message=counter_argument)
-                        print(f"✅ STORED PATHOS RESPONSE AS bot_message")
+                        print(f"✅ STORED {persuasion_type.upper()} RESPONSE AS bot_message FOR FUTURE EVALUATION")
                         
-                        # Run database checks before returning
-                        state = self._run_database_checks(state)
                         return state
-                
-                # Generate fallback pathos response if needed
-                print(f"⚠️ NO PATHOS RESPONSE FOUND - GENERATING FALLBACK")
-                user_content = ""
-                if "user_message" in state:
-                    user_message = state["user_message"]
-                    user_content = user_message.content if hasattr(user_message, "content") else str(user_message)
-                
-                pathos_response = self._generate_fallback_pathos_response(user_content)
-                state["response"] = pathos_response
-                
-                # Store for future evaluation
+            
+            # Finally, fall back to standard generator
+            print(f"📝 NO DIRECT COUNTER-ARGUMENT FOUND, USING GENERATOR")
+            result_state = self.generator(state)
+            
+            # If generator produced a response, store it as bot_message
+            if "response" in result_state:
+                response = result_state["response"]
                 user_history = ""
                 if "user_message" in state and hasattr(state["user_message"], "history"):
                     user_history = state["user_message"].history
-                state["bot_message"] = ConvoMessage(history=user_history, message=pathos_response)
-                print(f"✅ STORED FALLBACK PATHOS RESPONSE AS bot_message")
+                result_state["bot_message"] = ConvoMessage(history=user_history, message=response)
+                print(f"✅ STORED GENERATOR RESPONSE AS bot_message FOR FUTURE EVALUATION")
                 
-                # Run database checks before returning
-                state = self._run_database_checks(state)
-                return state
-            
-            # If it's logos, ensure we use a logical response
-            elif user_persuasion_type == "logos":
-                print(f"🧠 USER USED LOGOS ARGUMENTS - GENERATING LOGICAL RESPONSE")
-                state["counter_persuasion_type"] = "logos"
-                state["metadata"]["global_state"]["counter_persuasion_type"] = "logos"
-            
-            # If it's ethos, ensure we use an ethical response
-            elif user_persuasion_type == "ethos":
-                print(f"🏛️ USER USED ETHOS ARGUMENTS - GENERATING ETHICAL RESPONSE")
-                state["counter_persuasion_type"] = "ethos"
-                state["metadata"]["global_state"]["counter_persuasion_type"] = "ethos"
-        else:
-            # Default to logos if no classification found
-            print(f"⚠️ NO ARGUMENT CLASSIFICATION FOUND - DEFAULTING TO LOGOS")
-            state["user_persuasion_type"] = "logos"
-            state["counter_persuasion_type"] = "logos"
-            state["metadata"]["global_state"]["user_persuasion_type"] = "logos"
-            state["metadata"]["global_state"]["counter_persuasion_type"] = "logos"
-        
-        # STEP: Generate response based on current state
-        # First check for direct counter_argument from PersuasionWorker
-        if "counter_argument" in state:
-            print(f"📝 USING counter_argument DIRECTLY FROM PERSUASION WORKER")
-            counter_argument = state["counter_argument"]
-            state["response"] = counter_argument
-            
-            # Store the counter_argument as bot_message for future evaluation
-            user_history = ""
-            if "user_message" in state and hasattr(state["user_message"], "history"):
-                user_history = state["user_message"].history
-            state["bot_message"] = ConvoMessage(history=user_history, message=counter_argument)
-            print(f"✅ STORED counter_argument AS bot_message FOR FUTURE EVALUATION")
-            
-            # Run database checks before returning
-            state = self._run_database_checks(state)
-            return state
-        
-        # Then check for persuasion type-specific responses
-        for persuasion_type in ["pathos", "logos", "ethos"]:
-            response_key = f"{persuasion_type}_persuasion_response"
-            if response_key in state:
-                response_obj = state[response_key]
-                if isinstance(response_obj, dict) and "counter_argument" in response_obj:
-                    print(f"📝 USING {persuasion_type.upper()} PERSUASION RESPONSE")
-                    counter_argument = response_obj["counter_argument"]
-                    state["response"] = counter_argument
-                    
-                    # Store the counter_argument as bot_message for future evaluation
-                    user_history = ""
-                    if "user_message" in state and hasattr(state["user_message"], "history"):
-                        user_history = state["user_message"].history
-                    state["bot_message"] = ConvoMessage(history=user_history, message=counter_argument)
-                    print(f"✅ STORED {persuasion_type.upper()} RESPONSE AS bot_message FOR FUTURE EVALUATION")
-                    
-                    # Run database checks before returning
-                    state = self._run_database_checks(state)
-                    return state
-        
-        # Finally, fall back to standard generator
-        print(f"📝 NO DIRECT COUNTER-ARGUMENT FOUND, USING GENERATOR")
-        result_state = self.generator(state)
-        
-        # If generator produced a response, store it as bot_message
-        if "response" in result_state:
-            response = result_state["response"]
-            user_history = ""
-            if "user_message" in state and hasattr(state["user_message"], "history"):
-                user_history = state["user_message"].history
-            result_state["bot_message"] = ConvoMessage(history=user_history, message=response)
-            print(f"✅ STORED GENERATOR RESPONSE AS bot_message FOR FUTURE EVALUATION")
-            
-        # Run database checks before returning
-        result_state = self._run_database_checks(result_state)
-        return result_state
+            return result_state
 
     def run(self, msg_state: MessageState) -> MessageState:
         """Generate a debate message based on the current context."""
@@ -777,8 +616,7 @@ Response:"""
             print(f"✅ Final response prepared using {persuasion_type.upper()} strategy")
             
             # Ensure we have all the necessary state for the next round
-            # This method should check that all required state variables are present 
-            # and update the database with any new information
+            # This method ensures all required state variables are present
             msg_state = self._ensure_state_for_next_round(msg_state, persuasion_type)
             
             return msg_state
@@ -809,4 +647,45 @@ Response:"""
         # We don't want to overwrite counter_persuasion_type here, as that's determined by 
         # the EffectivenessEvaluator after the user responds
         
-        return msg_state 
+        return msg_state
+
+    def _create_action_graph(self):
+        """
+        Create a processing flow for debate interactions with the following chain:
+        debate message worker -> debate rag worker -> argument classifier -> 
+        effectiveness score -> persuasion type -> debate message worker
+        """
+        workflow = StateGraph(MessageState)
+        
+        # Initialize worker instances
+        rag_worker = DebateRAGWorker()
+        arg_classifier = ArgumentClassifier()
+        effectiveness_evaluator = EffectivenessEvaluator()
+        persuasion_worker = PersuasionWorker()
+        
+        # Add nodes for message generation
+        workflow.add_node("initial_generator", self.generator)
+        workflow.add_node("stream_generator", self.stream_generator)
+        
+        # Add worker nodes in the chain
+        workflow.add_node("rag", rag_worker.execute)
+        workflow.add_node("classifier", arg_classifier.execute)
+        workflow.add_node("effectiveness", effectiveness_evaluator.execute)
+        workflow.add_node("persuasion", persuasion_worker.execute)
+        workflow.add_node("final_generator", self.generator)
+        
+        # Setup the workflow paths
+        # For initial state, decide between streaming or regular generation
+        workflow.add_conditional_edges(START, self.choose_generator)
+        
+        # For stream mode
+        workflow.add_edge("stream_generator", END)
+        
+        # For regular mode - follow the full chain
+        workflow.add_edge("initial_generator", "rag")
+        workflow.add_edge("rag", "classifier")
+        workflow.add_edge("classifier", "effectiveness")
+        workflow.add_edge("effectiveness", "persuasion")
+        workflow.add_edge("persuasion", "final_generator")
+        
+        return workflow 

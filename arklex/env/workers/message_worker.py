@@ -114,4 +114,3 @@ class MessageWorker(BaseWorker):
         graph = self.action_graph.compile()
         result = graph.invoke(msg_state)
         return result
-
