@@ -37,9 +37,11 @@ class EffectivenessEvaluator(BaseWorker):
     def __init__(self):
         super().__init__()
         self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
-            model=MODEL["model_type_or_path"], timeout=30000
+            model=MODEL["model_type_or_path"], timeout=30000, 
+            temperature = 0.0
         )
         self.action_graph = self._create_action_graph(); 
+        logger.info("Effectiveness Evaluator initialized successfully")
 
     def _effectiveness_score(self, state: MessageState):
         """
@@ -125,5 +127,3 @@ class EffectivenessEvaluator(BaseWorker):
         result = graph.invoke(state)
         return result
     
-# Register the effectiveness evaluator worker
-register_worker(EffectivenessEvaluator) 

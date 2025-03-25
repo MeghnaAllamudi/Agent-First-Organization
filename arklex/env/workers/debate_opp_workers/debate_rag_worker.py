@@ -170,6 +170,3 @@ class DebateRAGWorker(BaseWorker):
         graph = self.action_graph.compile()
         result = graph.invoke(state)
         return result
-    
-# Register the effectiveness evaluator worker
-register_worker(DebateRAGWorker) 

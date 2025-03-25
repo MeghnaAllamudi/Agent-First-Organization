@@ -44,6 +44,11 @@
             "id": "70ba6243-0a95-4c9f-8578-4c543ab7a429",
             "name": "EffectivenessEvaluator",
             "path": "debate_opp_workers/effectiveness_evaluator_worker.py"
+        }, 
+        {
+            "id": "b2ca6348-9d83-4e7b-a12c-7f82e5bf3a92",
+            "name": "DebateHistoryDatabaseWorker",
+            "path": "debate_opp_workers/debate_history_db_worker.py"
         }
     ],
     "tools": []

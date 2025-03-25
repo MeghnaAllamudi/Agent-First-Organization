@@ -60,7 +60,10 @@ NO_BOOKING_MESSAGE = "You have not booked any show."
 
 class DatabaseActions:
     def __init__(self, user_id: str=USER_ID):
-        self.db_path = os.path.join(os.environ.get("DATA_DIR"), DBNAME)
+        # Get the default data directory if DATA_DIR is not set
+        default_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "tools", "database", "debate_db")
+        data_dir = os.environ.get("DATA_DIR", default_data_dir)
+        self.db_path = os.path.join(data_dir, DBNAME)
         self.llm = ChatOpenAI(model=MODEL["model_type_or_path"], timeout=30000)
         self.user_id = user_id
 
@@ -248,6 +251,109 @@ class DatabaseActions:
             results_df = pd.DataFrame(results)
             msg_state["message_flow"] = "The cancelled show is:\n" + results_df.to_string(index=False)
             msg_state["status"] = StatusEnum.COMPLETE.value
+        cursor.close()
         conn.close()
-        cursor.commit()
         return msg_state
+    
+    def insert_latest_debate_argument(self, msg_state: MessageState) -> MessageState:
+        """
+        Inserts the latest debate arguments and strategies into the debate_history table
+        
+        Args:
+            msg_state (MessageState): The current message state containing the debate information
+            
+        Returns:
+            MessageState: The updated message state
+        """
+        logger.info("Inserting latest debate argument into database")
+        
+        # Extract debate information from the message state
+        user_argument = msg_state.get("user_message").message
+        bot_argument = msg_state.get("orchestrator_message").message
+        user_strategy = msg_state.get("user_classification", "")
+        bot_strategy = msg_state.get("bot_classification", "")
+        
+        # Connect to the database
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Insert a row into the debate_history table
+        cursor.execute('''
+            INSERT INTO debate_history (id, user_id, user_argument, bot_argument, user_strategy, bot_strategy, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            "debate_" + str(uuid.uuid4()),
+            self.user_id,
+            user_argument,
+            bot_argument,
+            user_strategy,
+            bot_strategy,
+            datetime.now()
+        ))
+        
+        # Commit changes and close the connection
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # No need to modify the message state, just return it
+        return msg_state
+    
+    def get_debate_history(self, msg_state: MessageState, limit: int = 10) -> MessageState:
+        """
+        Retrieves the debate history from the database
+        
+        Args:
+            msg_state (MessageState): The current message state
+            limit (int): Maximum number of records to retrieve
+            
+        Returns:
+            MessageState: Updated message state with debate history
+        """
+        logger.info(f"Retrieving debate history for user {self.user_id}, limit: {limit}")
+        
+        # Connect to the database
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Check if the debate_history table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='debate_history'")
+        if not cursor.fetchone():
+            logger.warning("Debate history table does not exist")
+            msg_state["message_flow"] = "No debate history available."
+            msg_state["status"] = StatusEnum.COMPLETE.value
+            conn.close()
+            return msg_state
+        
+        # Query the debate history
+        query = """
+        SELECT id, user_argument, bot_argument, user_strategy, bot_strategy, timestamp
+        FROM debate_history
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """
+        cursor.execute(query, (self.user_id, limit))
+        rows = cursor.fetchall()
+        
+        if not rows:
+            msg_state["message_flow"] = "You don't have any debate history yet."
+            msg_state["status"] = StatusEnum.COMPLETE.value
+        else:
+            column_names = [column[0] for column in cursor.description]
+            results = [dict(zip(column_names, row)) for row in rows]
+            results_df = pd.DataFrame(results)
+            
+            # Format timestamps for better readability
+            if 'timestamp' in results_df.columns:
+                results_df['timestamp'] = pd.to_datetime(results_df['timestamp'])
+                results_df['timestamp'] = results_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            
+            msg_state["debate_history"] = results
+            msg_state["message_flow"] = f"Your recent debate history:\n{results_df.to_string(index=False)}"
+            msg_state["status"] = StatusEnum.COMPLETE.value
+        
+        cursor.close()
+        conn.close()
+        return msg_state
+    

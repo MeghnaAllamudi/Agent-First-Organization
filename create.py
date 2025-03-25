@@ -19,18 +19,6 @@ from arklex.utils.model_config import MODEL
 
 from arklex.utils.rate_limiter import RateLimiter
 
-from arklex.env.workers.worker import BaseWorker, register_worker
-from arklex.env.workers.debate_opp_workers.debate_rag_worker import DebateRAGWorker
-
-from arklex.env.workers.message_worker import MessageWorker
-from arklex.env.workers.default_worker import DefaultWorker
-from arklex.env.workers.debate_opp_workers.persuasion_worker import PersuasionWorker
-from arklex.env.workers.debate_opp_workers.debate_message_worker import DebateMessageWorker
-from arklex.env.workers.debate_opp_workers.argument_classifier_worker import ArgumentClassifier
-from arklex.env.workers.debate_opp_workers.effectiveness_evaluator_worker import EffectivenessEvaluator
-
-
-
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
 
@@ -68,7 +56,9 @@ def init_worker(args):
         for worker_name in worker_names: 
             if worker_name == "DebateRAGWorker":
                 build_rag(args.output_dir, config["rag_docs"])
- 
+            elif worker_name == "DebateHistoryDatabaseWorker":
+                build_database(args.output_dir)
+                
     if "FaissRAGWorker" in worker_names:
         logger.info("Initializing FaissRAGWorker...")
         # if url: uncomment the following line
