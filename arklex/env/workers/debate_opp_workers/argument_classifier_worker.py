@@ -11,7 +11,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START
 
 from arklex.env.workers.worker import BaseWorker, register_worker
-from arklex.utils.graph_state import MessageState, ConvoMessage
+from arklex.utils.graph_state import MessageState, ConvoMessage, Slot
 from arklex.utils.model_config import MODEL
 from arklex.utils.model_provider_config import PROVIDER_MAP
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ArgumentClassifier(BaseWorker):
     """A worker that classifies user and bot arguments into different types."""
     
-    description = "This should run right after the DebateRAGWorker for every user response. It should analyze each user and bot argument to classify them as emotional (pathos), logical (logos), or ethical (ethos)."
+    description = "This should analyze each user and bot argument to classify them as emotional (pathos), logical (logos), or ethical (ethos). It should only run once per user repsonse"
     
     # Class-level counter to track execution calls
     _execution_count = 0
@@ -50,20 +50,19 @@ class ArgumentClassifier(BaseWorker):
             temperature = 0.0
         )
         self.action_graph = self._create_action_graph()
-
+    
     def _classify_arguments(self, state: MessageState):
         """Classifies all arguments in the state using llm."""
         
-        # Try multiple sources to find the bot message
-        bot_message = state["bot_message"]
-    
+        user_message = state["user_message"].message
+        bot_message =  bot_message = state["slots"]["bot_message"][0].value
         user_classification_prompt = f"""
             Analyze the following argument and classify it as primarily using one of these persuasion types:
             - pathos: Appeals to emotion, feelings, and personal experience
             - logos: Appeals to logic, facts, data, and rational thinking
             - ethos: Appeals to credibility, authority, ethics, and moral principles
             
-            Argument: {state["user_message"].message}
+            Argument: {user_message}
             
             Please respond with a single word: pathos, logos, or ethos.
             """
@@ -86,18 +85,32 @@ class ArgumentClassifier(BaseWorker):
         bot_result = self.llm.invoke(bot_classification_prompt)
         bot_result_text = bot_result.content.strip()
         
-        logger.info("USER ARGUMENT CLASSIFICATION: {user_result_text}")
-        logger.info("BOT ARGUMENT CLASSIFICATION: {bot_result_text}")
+        state["slots"]["bot_classification"] = [Slot(
+                name = "bot_classification", 
+                type = "string", 
+                value = bot_result_text, 
+                enum = [],
+                description = "This is the value that holds the classification of the bot's argument.", 
+                prompt = "", 
+                required = False, 
+                verified = True)] 
         
-        state["user_classification"] = user_result_text
-        state["bot_classification"] = bot_result_text
-        state["bot_message"] = bot_message
+        state["slots"]["user_classification"] = [Slot(
+                name = "user_classification", 
+                type = "string", 
+                value = user_result_text, 
+                enum = [],
+                description = "This is the value that holds the classification of the user's argument.", 
+                prompt = "", 
+                required = False, 
+                verified = True)] 
         
         print("ARGUMENT CLASSIFIER")
-        print("user_message: " + state["user_message"].message)
-        print("bot_message: " + bot_message)
-        print("user_classification: " + state["user_classification"])
-        print("bot_classification: " + state["bot_classification"]) 
+        #print(state)
+        print("user_message: " + user_message[:30])
+        #print("bot_message:  " + bot_message[:30])
+        print("user_classification: " + state["slots"]["user_classification"][0].value)
+        print("bot_classification: " + state["slots"]["bot_classification"][0].value) 
         print("==========================================================")
         
     def _create_action_graph(self):

@@ -10,7 +10,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from arklex.env.workers.worker import BaseWorker, register_worker
-from arklex.utils.graph_state import MessageState
+from arklex.utils.graph_state import MessageState, Slot
 from arklex.utils.model_config import MODEL
 from langgraph.graph import StateGraph, START
 from arklex.utils.model_provider_config import PROVIDER_MAP
@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 class EffectivenessEvaluator(BaseWorker):
     """A worker that evaluates the effectiveness of counter-arguments."""
     
-    description = "This must run after the ArgumentClassifier after each user response. It Evaluates the effectiveness of counter-arguments based on multiple criteria."
+    description = "This evaluates the effectiveness of counter-arguments based on multiple criteria.  It should only run once per user repsonse."
 
     def __init__(self):
         super().__init__()
         self.llm = PROVIDER_MAP.get(MODEL['llm_provider'], ChatOpenAI)(
-            model=MODEL["model_type_or_path"], timeout=30000, 
+            model=MODEL["model_type_or_path"], timeout=30000,
             temperature = 0.0
         )
         self.action_graph = self._create_action_graph(); 
@@ -56,7 +56,7 @@ class EffectivenessEvaluator(BaseWorker):
             and improvement suggestions
         """
         # Get the bot and user messages from state
-        bot_message = state.get("bot_message", None)
+        bot_message = state["slots"]["bot_message"][0].value
         user_message = state.get("user_message", None)
         
         
@@ -114,10 +114,18 @@ class EffectivenessEvaluator(BaseWorker):
             logger.error(f"Error parsing effectiveness score: {e}")
             score = 50.0  # Default value
         
-        state["effectiveness_score"] = score
+        state["slots"]["effectiveness_score"] = [Slot(
+                name = "effectiveness_score", 
+                type = "string", 
+                value = score, 
+                enum = [],
+                description = "This is the score of how effective the bot's argument was to the user", 
+                prompt = "", 
+                required = False, 
+                verified = True)] 
         
         print("EFFECTIVENESS EVALUATOR")
-        print(f"effective_score: {state['effectiveness_score']}")
+        print(f"effective_score: " + str(state["slots"]["effectiveness_score"][0].value))
         print("==========================================================")
         
     def _create_action_graph(self):

@@ -16,39 +16,14 @@
             "path": "default_worker.py"
         },
         {
-            "id": "3621de07-a43c-6589-a1d2-f4b86492aea8",
-            "name": "MessageWorker",
-            "path": "message_worker.py"
-        },
-        {
-            "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
-            "name": "DebateRAGWorker",
-            "path": "debate_opp_workers/debate_rag_worker.py"
-        },
-        {
-            "id": "1521f4a2-f699-4c41-a751-274d30f4c171",
-            "name": "ArgumentClassifier",
-            "path": "debate_opp_workers/argument_classifier_worker.py"
-        },
-        {
-            "id": "ffb5faac-60c3-46a9-b116-d833d5a7bfa1",
-            "name": "PersuasionWorker",
-            "path": "debate_opp_workers/persuasion_worker.py"
-        },
-        {
             "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
             "name": "DebateMessageWorker",
             "path": "debate_opp_workers/debate_message_worker.py"
         },
         {
-            "id": "70ba6243-0a95-4c9f-8578-4c543ab7a429",
-            "name": "EffectivenessEvaluator",
-            "path": "debate_opp_workers/effectiveness_evaluator_worker.py"
-        }, 
-        {
-            "id": "b2ca6348-9d83-4e7b-a12c-7f82e5bf3a92",
-            "name": "DebateHistoryDatabaseWorker",
-            "path": "debate_opp_workers/debate_history_db_worker.py"
+            "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+            "name": "DebateRAGWorker",
+            "path": "debate_opp_workers/debate_rag_worker.py"
         }
     ],
     "tools": []

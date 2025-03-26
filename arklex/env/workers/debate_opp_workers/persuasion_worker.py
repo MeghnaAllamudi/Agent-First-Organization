@@ -10,7 +10,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from arklex.env.workers.worker import BaseWorker, register_worker
-from arklex.utils.graph_state import MessageState
+from arklex.utils.graph_state import MessageState, Slot
 from arklex.utils.model_config import MODEL
 from arklex.utils.model_provider_config import PROVIDER_MAP
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class PersuasionWorker(BaseWorker):
     """This must run after the EffectivenessEvaluator. This worker generates counter-arguments using different persuasion techniques."""
     
-    description = "This must run after the EffectivenessEvaluator. This worker generates counter-arguments using different persuasion techniques."
+    description = "This worker generates counter-arguments using different persuasion techniques."
     
     def __init__(self):
         super().__init__()
@@ -47,7 +47,7 @@ class PersuasionWorker(BaseWorker):
         # Get relevant state information
         user_message = state.get("user_message", {}).message
             
-        bot_message = state.get("bot_message", state.get("response", ""))
+        bot_message = state["slots"]["bot_message"][0].value
             
         # Get the topic from state - use either the stored topic or extract it from the bot message
         topic = state.get("topic", "")
@@ -65,9 +65,9 @@ class PersuasionWorker(BaseWorker):
         # Log the topic for debugging
         logger.info(f"Debate topic: {topic}")
             
-        user_classification = state.get("user_classification", "logos")
-        bot_classification = state.get("bot_classification", "logos")
-        effectiveness_score = state.get("effectiveness_score", 50.0)
+        user_classification = state["slots"]["user_classification"][0].value
+        bot_classification = state["slots"]["bot_classification"][0].value
+        effectiveness_score = state["slots"]["effectiveness_score"][0].value
         
         # Log the values for debugging
         logger.info(f"User classification: {user_classification}")
@@ -117,13 +117,21 @@ class PersuasionWorker(BaseWorker):
         counter_argument = response.content.strip()
         
         # Update state with new counter-argument
-        state["new_counter_argument"] = counter_argument
-        state["response"] = counter_argument
-        state["bot_message"] = counter_argument
-        state["persuasion_strategy_used"] = classification_to_use
+        #state["response"] = counter_argument
+        
+        state["slots"]["persuasion_counter"] = [Slot(
+                name = "persuasion_counter", 
+                type = "string", 
+                value = counter_argument, 
+                enum = [],
+                description = "This is the counter argument that the bot should use next", 
+                prompt = "", 
+                required = False, 
+                verified = True)] 
         
         print("PERSUASION_WORKER")
         print("classification to use: " + classification_to_use)
+        print("next response: " + state["slots"]["persuasion_counter"][0].value)
         print("==========================================================")
         
     def _create_action_graph(self):

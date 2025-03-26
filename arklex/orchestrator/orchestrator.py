@@ -259,10 +259,10 @@ class AgentOrg:
                     FINISH = True
                     break
                 # If the Message Worker enters the loop, ReAct framework cannot make a good decision between the MessageWorker and the RESPOND action.
-                elif node_info["id"] == self.env.name2id["MessageWorker"]:
+                elif node_info["id"] == self.env.name2id["DebateMessageWorker"]:
                     logger.info("Skip ReAct framework because it is hard to distinguish between the MessageWorker and the RESPOND action")
                     message_state["response"] = "" # clear the response cache generated from the previous steps in the same turn
-                    response_state, params = self.env.step(self.env.name2id["MessageWorker"], message_state, params)
+                    response_state, params = self.env.step(self.env.name2id["DebateMessageWorker"], message_state, params)
                     FINISH = True
                     break
                 action_spaces = node_actions

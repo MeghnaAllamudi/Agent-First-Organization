@@ -18,7 +18,7 @@ from arklex.utils.model_provider_config import PROVIDER_MAP
 logger = logging.getLogger(__name__)
 
 
-@register_worker
+#@register_worker
 class MessageWorker(BaseWorker):
 
     description = "The worker that used to deliver the message to the user, either a question or provide some information."
@@ -32,6 +32,8 @@ class MessageWorker(BaseWorker):
 
     def generator(self, state: MessageState) -> MessageState:
         # get the input message
+        print("MESSAGE WORKER ")
+        print("===============================================")
         user_message = state['user_message']
         orchestrator_message = state['orchestrator_message']
         message_flow = state.get('response', "") + "\n" + state.get("message_flow", "")
@@ -68,6 +70,8 @@ class MessageWorker(BaseWorker):
     
     def stream_generator(self, state: MessageState) -> MessageState:
         # get the input message
+        print("MESSAGE WORKER ")
+        print("===============================================")
         user_message = state['user_message']
         orchestrator_message = state['orchestrator_message']
         message_flow = state.get('response', "") + "\n" + state.get("message_flow", "")

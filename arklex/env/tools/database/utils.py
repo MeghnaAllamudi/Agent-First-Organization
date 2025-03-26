@@ -16,7 +16,7 @@ from arklex.env.prompts import load_prompts
 from arklex.utils.graph_state import StatusEnum
 
 
-DBNAME = 'show_booking_db.sqlite'
+DBNAME = 'debate_history_db.sqlite'
 USER_ID = "user_be6e1836-8fe9-4938-b2d0-48f810648e72"
 
 logger = logging.getLogger(__name__)
@@ -392,16 +392,12 @@ class DebateDatabaseActions:
         cursor = conn.cursor()
         
         # Extract debate information from message state
-        user_argument = msg_state.get("user_message", {}).get("message", "")
+        user_argument = msg_state["user_message"].message
         # Try multiple fields where the bot's message might be stored
-        bot_argument = msg_state.get("new_counter_argument", "")
-        if not bot_argument:
-            bot_argument = msg_state.get("response", "")
-        if not bot_argument:
-            bot_argument = msg_state.get("bot_message", "")
+        bot_argument = msg_state["slots"]["bot_message"][0].value
         
-        user_strategy = msg_state.get("user_classification", "")
-        bot_strategy = msg_state.get("persuasion_strategy_used", msg_state.get("bot_classification", ""))
+        user_strategy = msg_state["slots"]["user_classification"][0].value
+        bot_strategy = msg_state["slots"]["bot_classification"][0].value
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
