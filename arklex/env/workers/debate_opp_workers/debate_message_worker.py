@@ -75,10 +75,6 @@ class DebateMessageWorker(MessageWorker):
         else: 
             state["response"] = state["slots"]["persuasion_counter"][0].value
         return state
-        if "slots" not in state:
-            state["slots"] = {}
-        
-        return state
     
     def choose_generator(self, state: MessageState):
         if state["is_stream"]:

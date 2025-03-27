@@ -102,11 +102,12 @@ class PersuasionWorker(BaseWorker):
         {"Since this was less than 50, you need to adapt by matching the user's persuasion style." if effectiveness_score < 50 else "Since this was effective, you should continue with your current persuasion approach."}
 
         IMPORTANT GUIDELINES:
-        1. Maintain your opposition to the topic - your job is to challenge the user
+        1. Acknowledge some of the points the user made if they are good points while maintaining your opposition in a respectful way to help challenge the user
         2. Use specific {classification_to_use}-based appeals in your arguments
         3. Be direct, specific, and use concrete examples to support your position
-        4. Address specific points from the user's argument
-        5. Keep your response conversational (about 3-4 paragraphs)
+        4. Address specific points from the user's argument and it's okay to agree with some of what the user said if they bring up good points
+        5. Keep your response conversational (about 1-2 paragraphs)
+        6. Show the user you are listening to what they are saying while maintaining your opposition to challenge their counter arguments
         6. End with a question or statement that encourages further discussion
 
         Generate a persuasive counter-argument now:

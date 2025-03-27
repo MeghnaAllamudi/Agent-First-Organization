@@ -24,6 +24,11 @@
             "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
             "name": "DebateRAGWorker",
             "path": "debate_opp_workers/debate_rag_worker.py"
+        },
+        {
+            "id": "3621de07-a43c-6589-a1d2-f4b86492aea8",
+            "name": "MessageWorker",
+            "path": "message_worker.py"
         }
     ],
     "tools": []

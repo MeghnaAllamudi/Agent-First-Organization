@@ -55,7 +55,21 @@ class ArgumentClassifier(BaseWorker):
         """Classifies all arguments in the state using llm."""
         
         user_message = state["user_message"].message
-        bot_message =  bot_message = state["slots"]["bot_message"][0].value
+        bot_message = ""
+        if "slots" in state and "bot_message" in state["slots"]:
+            bot_message = state["slots"]["bot_message"][0].value
+        else: 
+            bot_message = state["trajectory"][-2]["content"]
+            state["slots"]["bot_message"] = [Slot(
+                        name = "bot_message", 
+                        type = "string", 
+                        value = bot_message, 
+                        enum = [],
+                        description = "This is the last bot message before the last user response to help with argument classification", 
+                        prompt = "", 
+                        required = False, 
+                        verified = True)]  
+            
         user_classification_prompt = f"""
             Analyze the following argument and classify it as primarily using one of these persuasion types:
             - pathos: Appeals to emotion, feelings, and personal experience

@@ -25,7 +25,7 @@ load_dotenv()
 # Initialize rate limiter
 rate_limiter = RateLimiter()
 
-# API_PORT = "55135"
+API_PORT = "55135"
 # NLUAPI_ADDR = f"http://localhost:{API_PORT}/nlu"
 # SLOTFILLAPI_ADDR = f"http://localhost:{API_PORT}/slotfill"
 

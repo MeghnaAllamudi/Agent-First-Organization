@@ -96,8 +96,10 @@ def adjust_goal(doc_content, goal):
     return chatgpt_chatbot([{'role': 'user', 'content': message}], model=MODEL["model_type_or_path"])
 
 def generate_goal(doc_content):
-    message = f"Pretend you have just read the following website:\n{doc_content}\nThis website also has a chatbot. What is some information you want to get from this chatbot or a goal you might have when chatting with this chatbot based on the website content? Answer the question in the first person. Only give the answer to the question in your response."
-    
+    #DEBATE BOT PROMPT 
+    message = f"Pretend you have just read the following website for a specific debate topic:\n{doc_content}\nThis website also has a chatbot. What stance would you take (for or against) and what pathos, logos and ethos persuasive arguments could you generate in support of that stance? You want to feel both heard and challenged when looking at the counter arguments for the opposite stance. Answer the question in the first person. Only give the answer to the question in your response."
+    #CUSTOMER SERVICE PROMPT
+    #message = f"Pretend you have just read the following website:\n{doc_content}\nThis website also has a chatbot. What is some information you want to get from this chatbot or a goal you might have when chatting with this chatbot based on the website content? Answer the question in the first person. Only give the answer to the question in your response."
     return chatgpt_chatbot([{'role': 'user', 'content': message}], model=MODEL["model_type_or_path"])
 
 def generate_goals(documents, params):
