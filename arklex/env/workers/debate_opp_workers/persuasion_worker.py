@@ -76,7 +76,7 @@ class PersuasionWorker(BaseWorker):
         
         # Determine which classification to use for next argument
         classification_to_use = user_classification if effectiveness_score < 50 else bot_classification
-        logger.info(f"Using classification: {classification_to_use}")
+        logger.info(f"Using classification: {classification_to_use} because effectiveness score is {effectiveness_score}")
         
         persuasion_descriptions = {
             "pathos": "emotional appeals, personal stories, vivid imagery, and language that evokes feelings",
@@ -103,12 +103,13 @@ class PersuasionWorker(BaseWorker):
 
         IMPORTANT GUIDELINES:
         1. Acknowledge some of the points the user made if they are good points while maintaining your opposition in a respectful way to help challenge the user
-        2. Use specific {classification_to_use}-based appeals in your arguments
-        3. Be direct, specific, and use concrete examples to support your position
-        4. Address specific points from the user's argument and it's okay to agree with some of what the user said if they bring up good points
-        5. Keep your response conversational (about 1-2 paragraphs)
-        6. Show the user you are listening to what they are saying while maintaining your opposition to challenge their counter arguments
-        6. End with a question or statement that encourages further discussion
+        2. Make sure the argument is engaging and make sure it flows with the user's response, like an ongoing conversation. Be sure to address each of the user's points.
+        3. Use specific {classification_to_use}-based appeals in your arguments
+        4. Be direct, specific, and use concrete examples to support your position
+        5. Address specific points from the user's argument and it's okay to agree with some of what the user said if they bring up good points
+        6. Keep your response conversational (about 1-2 paragraphs)
+        7. Show the user you are listening to what they are saying while maintaining your opposition to challenge their counter arguments
+        8. End with a question or statement that encourages further discussion
 
         Generate a persuasive counter-argument now:
         """
@@ -132,7 +133,7 @@ class PersuasionWorker(BaseWorker):
         
         print("PERSUASION_WORKER")
         print("classification to use: " + classification_to_use)
-        print("next response: " + state["slots"]["persuasion_counter"][0].value)
+        print("next response: " + state["slots"]["persuasion_counter"][0].value[:20])
         print("==========================================================")
         
     def _create_action_graph(self):
