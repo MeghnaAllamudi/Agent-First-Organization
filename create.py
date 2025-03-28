@@ -17,12 +17,21 @@ from arklex.env.tools.RAG.build_rag import build_rag
 from arklex.env.tools.database.build_database import build_database
 from arklex.utils.model_config import MODEL
 
+from arklex.utils.rate_limiter import RateLimiter
+
 logger = init_logger(log_level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), "logs", "arklex.log"))
 load_dotenv()
 
-# API_PORT = "55135"
+# Initialize rate limiter
+rate_limiter = RateLimiter()
+
+API_PORT = "55135"
 # NLUAPI_ADDR = f"http://localhost:{API_PORT}/nlu"
 # SLOTFILLAPI_ADDR = f"http://localhost:{API_PORT}/slotfill"
+
+def create_output_dir(output_dir: str):
+    """Create output directory if it doesn't exist."""
+    os.makedirs(output_dir, exist_ok=True)
 
 def generate_taskgraph(args):
     model = ChatOpenAI(model=MODEL["model_type_or_path"], timeout=30000)
@@ -39,8 +48,17 @@ def generate_taskgraph(args):
 def init_worker(args):
     ## TODO: Need to customized based on different use cases
     config = json.load(open(args.config))
+    is_debate_config = "debate" in os.path.basename(args.config).lower()
     workers = config["workers"]
     worker_names = set([worker["name"] for worker in workers])
+    
+    if is_debate_config: 
+        for worker_name in worker_names: 
+            if worker_name == "DebateRAGWorker":
+                build_rag(args.output_dir, config["rag_docs"])
+            elif worker_name == "DebateHistoryDatabaseWorker":
+                build_database(args.output_dir)
+                
     if "FaissRAGWorker" in worker_names:
         logger.info("Initializing FaissRAGWorker...")
         # if url: uncomment the following line

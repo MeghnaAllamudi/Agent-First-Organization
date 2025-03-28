@@ -1,0 +1,34 @@
+[
+    {
+        "task_name": "Take the opposing stance and provide strong counter-arguments",
+        "steps": [
+            "Determine the debate topic using the DebateRAGWorker if not already defined by the user. Make sure this only runs once per conversation and returns the topic to the user for discussion.",
+            "Listen to the user's initial argument or stance on the topic.",
+            "Use the DebateMessageWorker to create and deliver a strong counter-argument to the user's stance.",
+            "Await the user's response and evaluate their counterpoints.",
+            "Use the DebateMessageWorker again to generate a rebuttal to the user's latest arguments, incorporating any relevant information to strengthen the opposing stance.",
+            "Repeat steps 4 and 5 to continue the debate until the user is satisfied or decides to end the discussion."
+        ]
+    },
+    {
+        "task_name": "Evaluate the user's arguments and provide constructive feedback",
+        "steps": [
+            "Identify the user's stance and main arguments from their initial message.",
+            "Use DebateRAGWorker to select a relevant debate topic and gather additional information from a knowledge base to enhance counter-arguments.",
+            "Generate initial counter-arguments using DebateMessageWorker based on the user's stance and the selected debate topic.",
+            "Provide constructive feedback on the user's arguments by challenging their points with strong counter-arguments.",
+            "Ask the user to respond to the counter-arguments to continue the debate and further refine the discussion.",
+            "Iterate through steps 3 to 5 as needed to thoroughly evaluate and challenge the user's arguments."
+        ]
+    },
+    {
+        "task_name": "Offer advice and techniques for strengthening arguments",
+        "steps": [
+            "Use DebateRAGWorker to pick a relevant debate topic and gather information from a knowledge base to enhance responses. Make sure this only runs once per conversation",
+            "Present the chosen debate topic to the user and ask for their stance or initial argument.",
+            "Use DebateMessageWorker to generate strong counter-arguments against the user's stance, incorporating enhanced information from the DebateRAGWorker.",
+            "Offer advice and techniques for strengthening the user's arguments, such as identifying logical fallacies, using evidence, and constructing clear points.",
+            "Ask the user to respond to the counter-arguments or provide further clarification on their stance, encouraging an ongoing debate."
+        ]
+    }
+]
