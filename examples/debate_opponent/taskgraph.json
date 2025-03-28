@@ -1,0 +1,535 @@
+{
+    "nodes": [
+        [
+            "0",
+            {
+                "resource": {
+                    "id": "8f7d3b2a-1e4c-3cpf-9b6a-5c2e8f1d3a4b",
+                    "name": "MessageWorker"
+                },
+                "attribute": {
+                    "value": "Welcome to the Debate Opponent! I'm here to challenge your viewpoints and engage in a lively debate. Share your stance on any topic, and I'll provide a thought-provoking counter-argument!",
+                    "task": "start message",
+                    "directed": false
+                },
+                "limit": 1,
+                "type": "start"
+            }
+        ],
+        [
+            "1",
+            {
+                "resource": {
+                    "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+                    "name": "DebateRAGWorker"
+                },
+                "attribute": {
+                    "value": "Let's discuss the topic of climate change. What are your thoughts on this issue?",
+                    "task": "Determine the debate topic using the DebateRAGWorker if not already defined by the user. Make sure this only runs once per conversation and returns the topic to the user for discussion.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "2",
+            {
+                "resource": {
+                    "id": "8f7d3b2a-4d3c-4d9f-9b6a-5c2e8f1d3a4b",
+                    "name": "MessageWorker"
+                },
+                "attribute": {
+                    "value": "",
+                    "task": "Provide the topic that was chosen in the response from the DebateRAGWorker",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "3",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "While you make a good point, it's important to consider the economic impacts of implementing stricter environmental regulations.",
+                    "task": "Use the DebateMessageWorker to create and deliver a strong counter-argument to the user's stance.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "4",
+            {
+                "resource": {
+                    "id": "default_worker",
+                    "name": "DefaultWorker"
+                },
+                "attribute": {
+                    "value": "",
+                    "task": "Await the user's response and evaluate their counterpoints.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "5",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "You raise a valid concern, but studies have shown that long-term benefits of sustainable practices outweigh the initial costs.",
+                    "task": "Use the DebateMessageWorker again to generate a rebuttal to the user's latest arguments, incorporating any relevant information to strengthen the opposing stance.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "6",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "I appreciate the engaging discussion. Let me know if you'd like to continue or move on to a different topic.",
+                    "task": "Repeat steps 4 and 5 to continue the debate until the user is satisfied or decides to end the discussion.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "7",
+            {
+                "resource": {
+                    "id": "default_worker",
+                    "name": "DefaultWorker"
+                },
+                "attribute": {
+                    "value": "I understand your point about [user's argument]. Let's explore this topic further.",
+                    "task": "Identify the user's stance and main arguments from their initial message.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "8",
+            {
+                "resource": {
+                    "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+                    "name": "DebateRAGWorker"
+                },
+                "attribute": {
+                    "value": "Based on our discussion, let's delve into the topic of [selected debate topic] with some additional insights.",
+                    "task": "Use DebateRAGWorker to select a relevant debate topic and gather additional information from a knowledge base to enhance counter-arguments.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "9",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "Considering your view on [user's stance], have you thought about [counter-argument]?",
+                    "task": "Generate initial counter-arguments using DebateMessageWorker based on the user's stance and the selected debate topic.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "10",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "Your argument about [user's point] is interesting, but it might be worth considering [counter-argument].",
+                    "task": "Provide constructive feedback on the user's arguments by challenging their points with strong counter-arguments.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "11",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "How would you respond to the argument that [counter-argument]?",
+                    "task": "Ask the user to respond to the counter-arguments to continue the debate and further refine the discussion.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "12",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "Let's continue refining our discussion. What are your thoughts on [new counter-argument]?",
+                    "task": "Iterate through steps 3 to 5 as needed to thoroughly evaluate and challenge the user's arguments.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "13",
+            {
+                "resource": {
+                    "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+                    "name": "DebateRAGWorker"
+                },
+                "attribute": {
+                    "value": "Let's discuss the topic of renewable energy. Here's some information to get us started.",
+                    "task": "Use DebateRAGWorker to pick a relevant debate topic and gather information from a knowledge base to enhance responses. Make sure this only runs once per conversation",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "14",
+            {
+                "resource": {
+                    "id": "default_worker",
+                    "name": "DefaultWorker"
+                },
+                "attribute": {
+                    "value": "What are your thoughts on renewable energy as the primary source of power in the future?",
+                    "task": "Present the chosen debate topic to the user and ask for their stance or initial argument.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "15",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "While you make a good point, consider the challenges of storage and reliability that renewable energy faces.",
+                    "task": "Use DebateMessageWorker to generate strong counter-arguments against the user's stance, incorporating enhanced information from the DebateRAGWorker.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "16",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "To strengthen your argument, you might want to include data on recent advancements in battery technology.",
+                    "task": "Offer advice and techniques for strengthening the user's arguments, such as identifying logical fallacies, using evidence, and constructing clear points.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ],
+        [
+            "17",
+            {
+                "resource": {
+                    "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+                    "name": "DebateMessageWorker"
+                },
+                "attribute": {
+                    "value": "How would you address the concerns about the intermittency of renewable energy sources?",
+                    "task": "Ask the user to respond to the counter-arguments or provide further clarification on their stance, encouraging an ongoing debate.",
+                    "directed": false
+                },
+                "limit": 1
+            }
+        ]
+    ],
+    "edges": [
+        [
+            "0",
+            "1",
+            {
+                "intent": "User presents an argument",
+                "attribute": {
+                    "weight": 1,
+                    "pred": true,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "1",
+            "2",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "2",
+            "3",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "3",
+            "4",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "4",
+            "5",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "5",
+            "6",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "0",
+            "7",
+            {
+                "intent": "User seeks feedback on debating skills",
+                "attribute": {
+                    "weight": 1,
+                    "pred": true,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "7",
+            "8",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "8",
+            "9",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "9",
+            "10",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "10",
+            "11",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "11",
+            "12",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "0",
+            "13",
+            {
+                "intent": "User requests tips to improve arguments",
+                "attribute": {
+                    "weight": 1,
+                    "pred": true,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "13",
+            "14",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "14",
+            "15",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "15",
+            "16",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ],
+        [
+            "16",
+            "17",
+            {
+                "intent": "None",
+                "attribute": {
+                    "weight": 1,
+                    "pred": false,
+                    "definition": "",
+                    "sample_utterances": []
+                }
+            }
+        ]
+    ],
+    "role": "Debate Opponent",
+    "user_objective": "The debate opponent actively takes opposing positions to the user's stance, vigorously challenging their viewpoints with strong counter-arguments. It does NOT present balanced perspectives but instead adopts and defends the opposite position from whatever the user argues, using persuasive techniques to strengthen its contrarian stance.",
+    "builder_objective": "The debate opponent helps users sharpen their argumentative skills by providing strong opposition to their viewpoints, forcing them to defend their positions more thoroughly and consider counter-arguments they might not have anticipated.",
+    "domain": "debate and persuasion",
+    "intro": "I am a debate opponent that adopts opposing stances to your arguments. I will challenge your position directly with the strongest counterarguments I can generate, taking the contrary position on any topic you present. This confrontational approach is designed to strengthen your argumentative skills and help you prepare for real-world debates.",
+    "rag_docs": [
+        {
+            "source": "https://debatewise.org/",
+            "num": 50
+        }
+    ],
+    "tasks": [],
+    "workers": [
+        {
+            "id": "4421de07-a43c-4589-a1d2-f4b86492aea8",
+            "name": "DefaultWorker",
+            "path": "default_worker.py"
+        },
+        {
+            "id": "720ecdd4-8cf2-47f2-a825-64bd07377950",
+            "name": "DebateMessageWorker",
+            "path": "debate_opp_workers/debate_message_worker.py"
+        },
+        {
+            "id": "8f7d3b2a-1e4c-4d9f-9b6a-5c2e8f1d3a4b",
+            "name": "DebateRAGWorker",
+            "path": "debate_opp_workers/debate_rag_worker.py"
+        },
+        {
+            "id": "3621de07-a43c-6589-a1d2-f4b86492aea8",
+            "name": "MessageWorker",
+            "path": "message_worker.py"
+        }
+    ],
+    "tools": [],
+    "nluapi": "",
+    "slotfillapi": ""
+}

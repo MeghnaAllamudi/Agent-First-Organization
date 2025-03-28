@@ -24,9 +24,6 @@ import sys
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 sys.path.insert(0, root_dir)
 
-# Import directly from the root directory
-from arklex.env.prompts_for_debate_opp import argument_classifier_prompt
-
 logger = logging.getLogger(__name__)
 
 

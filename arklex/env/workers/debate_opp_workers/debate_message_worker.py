@@ -17,7 +17,6 @@ from langgraph.graph import StateGraph, START, END
 from arklex.utils.model_provider_config import PROVIDER_MAP
 
 # Import the necessary worker classes
-from arklex.env.workers.debate_opp_workers.debate_rag_worker import DebateRAGWorker
 from arklex.env.workers.debate_opp_workers.argument_classifier_worker import ArgumentClassifier
 from arklex.env.workers.debate_opp_workers.effectiveness_evaluator_worker import EffectivenessEvaluator
 from arklex.env.workers.debate_opp_workers.persuasion_worker import PersuasionWorker
